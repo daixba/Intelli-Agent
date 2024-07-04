@@ -43,21 +43,6 @@ export class RootStack extends Stack {
     const cdkParameters = new DeploymentParameters(this);
     const iamHelper = new IAMHelper(this, "iam-helper");
 
-    const assetConstruct = new AssetsConstruct(this, "assets-construct", {
-      s3ModelAssets: cdkParameters.s3ModelAssets.valueAsString,
-      env: process.env,
-    });
-    const llmStack = new LLMStack(this, "rag-stack", {
-      s3ModelAssets: cdkParameters.s3ModelAssets.valueAsString,
-      embeddingAndRerankerModelPrefix: assetConstruct.embeddingAndRerankerModelPrefix,
-      embeddingAndRerankerModelVersion: assetConstruct.embeddingAndRerankerModelVersion,
-      instructModelPrefix: assetConstruct.instructModelPrefix,
-      instructModelVersion: assetConstruct.instructModelVersion,
-      iamHelper: iamHelper,
-      env: process.env,
-    });
-    llmStack.node.addDependency(assetConstruct);
-
     const vpcConstruct = new VpcConstruct(this, "vpc-construct");
 
     const aosConstruct = new AOSConstruct(this, "aos-construct", {
@@ -68,36 +53,6 @@ export class RootStack extends Stack {
 
     const dynamoDBConstruct = new DynamoDBConstruct(this, "ddb-construct");
 
-    const etlStack = new EtlStack(this, "etl-stack", {
-      domainEndpoint: aosConstruct.domainEndpoint || "",
-      embeddingAndRerankerEndPoint: llmStack.embeddingAndRerankerEndPoint,
-      region: props.env?.region || "us-east-1",
-      subEmail: cdkParameters.subEmail.valueAsString ?? "",
-      etlVpc: vpcConstruct.connectorVpc,
-      subnets: vpcConstruct.privateSubnets,
-      securityGroups: vpcConstruct.securityGroup,
-      s3ModelAssets: cdkParameters.s3ModelAssets.valueAsString,
-      openSearchIndex: cdkParameters.openSearchIndex.valueAsString,
-      imageName: cdkParameters.etlImageName.valueAsString,
-      etlTag: cdkParameters.etlImageTag.valueAsString,
-      iamHelper: iamHelper,
-    });
-    etlStack.node.addDependency(vpcConstruct);
-    etlStack.node.addDependency(aosConstruct);
-    etlStack.addDependency(llmStack);
-
-    const connectorConstruct = new ConnectorConstruct(this, "connector-construct", {
-      connectorVpc: vpcConstruct.connectorVpc,
-      securityGroup: vpcConstruct.securityGroup,
-      domainEndpoint: aosConstruct.domainEndpoint || "",
-      embeddingEndPoints: [llmStack.embeddingAndRerankerEndPoint],
-      openSearchIndex: cdkParameters.openSearchIndex.valueAsString,
-      openSearchIndexDict: cdkParameters.openSearchIndexDict.valueAsString,
-      env: process.env,
-    });
-    connectorConstruct.node.addDependency(vpcConstruct);
-    connectorConstruct.node.addDependency(aosConstruct);
-    connectorConstruct.node.addDependency(llmStack);
 
     const uiPortal = new PortalConstruct(this, "ui-construct");
 
@@ -110,37 +65,20 @@ export class RootStack extends Stack {
       apiVpc: vpcConstruct.connectorVpc,
       securityGroup: vpcConstruct.securityGroup,
       domainEndpoint: aosConstruct.domainEndpoint || "",
-      embeddingAndRerankerEndPoint: llmStack.embeddingAndRerankerEndPoint || "",
+      embeddingAndRerankerEndPoint: "",
       llmModelId: BuildConfig.LLM_MODEL_ID,
-      instructEndPoint:
-        BuildConfig.LLM_ENDPOINT_NAME !== ""
-          ? BuildConfig.LLM_ENDPOINT_NAME
-          : llmStack.instructEndPoint,
+      instructEndPoint: "",
       sessionsTableName: dynamoDBConstruct.sessionTableName,
       messagesTableName: dynamoDBConstruct.messageTableName,
       promptTableName: dynamoDBConstruct.promptTableName,
-      workspaceTableName: etlStack.workspaceTableName,
-      sfnOutput: etlStack.sfnOutput,
-      openSearchIndex: cdkParameters.openSearchIndex.valueAsString,
-      openSearchIndexDict: cdkParameters.openSearchIndexDict.valueAsString,
-      jobName: connectorConstruct.jobName,
-      jobQueueArn: connectorConstruct.jobQueueArn,
-      jobDefinitionArn: connectorConstruct.jobDefinitionArn,
-      etlEndpoint: etlStack.etlEndpoint,
-      resBucketName: etlStack.resBucketName,
-      executionTableName: etlStack.executionTableName,
-      etlObjTableName: etlStack.etlObjTableName,
-      etlObjIndexName: etlStack.etlObjIndexName,
-      env: process.env,
+      workspaceTableName: "",
       userPool: userConstruct.userPool,
       userPoolClientId: userConstruct.oidcClientId,
       iamHelper: iamHelper,
     });
     apiConstruct.node.addDependency(vpcConstruct);
     apiConstruct.node.addDependency(aosConstruct);
-    apiConstruct.node.addDependency(llmStack);
-    apiConstruct.node.addDependency(connectorConstruct);
-    apiConstruct.node.addDependency(etlStack);
+
 
     const uiExports = new UiExportsConstruct(this, "ui-exports", {
       portalBucket: uiPortal.portalBucket,
@@ -155,29 +93,9 @@ export class RootStack extends Stack {
     });
     uiExports.node.addDependency(uiPortal);
 
-    new CfnOutput(this, "AOS Index Dict", {
-      value: cdkParameters.openSearchIndexDict.valueAsString,
-    });
+
     new CfnOutput(this, "API Endpoint Address", {
       value: apiConstruct.apiEndpoint,
-    });
-    new CfnOutput(this, "Chunk Bucket", { value: etlStack.resBucketName });
-    new CfnOutput(this, "Document Bucket", { value: apiConstruct.documentBucket });
-    new CfnOutput(this, "Embedding and Rerank Endpoint", {
-      value: llmStack.embeddingAndRerankerEndPoint || "No Embedding Endpoint Created",
-    });
-    new CfnOutput(this, "ETL Object Table", {
-      value: etlStack.etlObjTableName,
-    });
-    new CfnOutput(this, "Execution Table", {
-      value: etlStack.executionTableName,
-    });
-    new CfnOutput(this, "Glue Job Name", { value: etlStack.jobName });
-    new CfnOutput(this, "Instruct Model Endpoint", {
-      value: llmStack.instructEndPoint || "No Instruct Endpoint Created",
-    });
-    new CfnOutput(this, "OpenSearch Endpoint", {
-      value: aosConstruct.domainEndpoint || "No OpenSearch Endpoint Created",
     });
     new CfnOutput(this, "VPC", { value: vpcConstruct.connectorVpc.vpcId });
     new CfnOutput(this, "WebPortalURL", {
@@ -188,9 +106,6 @@ export class RootStack extends Stack {
       value: apiConstruct.wsEndpoint,
     });
     new CfnOutput(this, "OidcClientId", {
-      value: userConstruct.oidcClientId,
-    });
-    new CfnOutput(this, "InitialPassword", {
       value: userConstruct.oidcClientId,
     });
     new CfnOutput(this, "UserPoolId", {

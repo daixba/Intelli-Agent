@@ -47,7 +47,7 @@ export class WebSocketConstruct extends Construct {
         join(__dirname, "../../../lambda/websocket/connect"),
       ),
       role: lambdaRole,
-      runtime: lambda.Runtime.PYTHON_3_11,
+      runtime: lambda.Runtime.PYTHON_3_12,
       handler: "connect.lambda_handler",
       timeout: Duration.minutes(15),
     });
@@ -57,7 +57,7 @@ export class WebSocketConstruct extends Construct {
         join(__dirname, "../../../lambda/websocket/disconnect"),
       ),
       role: lambdaRole,
-      runtime: lambda.Runtime.PYTHON_3_11,
+      runtime: lambda.Runtime.PYTHON_3_12,
       handler: "disconnect.lambda_handler",
       timeout: Duration.minutes(15),
     });
