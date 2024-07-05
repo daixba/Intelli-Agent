@@ -70,16 +70,16 @@ export class ApiConstruct extends Construct {
     const messageQueueV2 = queueConstruct.messageQueue;
 
     const lambdaLayers = new LambdaLayers(this);
-    // const apiLambdaExecutorLayer = lambdaLayers.createExecutorLayer();
-    const apiLambdaEmbeddingLayer = lambdaLayers.createEmbeddingLayer();
+    const apiDefaultLayer = lambdaLayers.createAPIDefaultLayer();
     const apiLambdaOnlineSourceLayer = lambdaLayers.createOnlineSourceLayer();
     const apiLambdaJobSourceLayer = lambdaLayers.createJobSourceLayer();
     const apiLambdaAuthorizerLayer = lambdaLayers.createAuthorizerLayer();
 
-    const embeddingLambda = new Function(this, "lambdaEmbedding", {
+
+    const restApiHandlerFn = new Function(this, "RestApiHandlerFn", {
       runtime: Runtime.PYTHON_3_12,
       handler: "main.lambda_handler",
-      code: Code.fromAsset(join(__dirname, "../../../lambda/embedding")),
+      code: Code.fromAsset(join(__dirname, "../../../lambda/api")),
       timeout: Duration.minutes(15),
       memorySize: 4096,
       // vpc: apiVpc,
@@ -91,10 +91,10 @@ export class ApiConstruct extends Construct {
       environment: {
         REGION: Aws.REGION,
       },
-      layers: [apiLambdaEmbeddingLayer],
+      layers: [apiDefaultLayer],
     });
 
-    embeddingLambda.addToRolePolicy(
+    restApiHandlerFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
           "es:ESHttpGet",
@@ -106,8 +106,8 @@ export class ApiConstruct extends Construct {
         resources: ["*"],
       }),
     );
-    embeddingLambda.addToRolePolicy(this.iamHelper.s3Statement);
-    embeddingLambda.addToRolePolicy(this.iamHelper.endpointStatement);
+    restApiHandlerFn.addToRolePolicy(this.iamHelper.s3Statement);
+    restApiHandlerFn.addToRolePolicy(this.iamHelper.endpointStatement);
 
 
     // Create Lambda Authorizer for WebSocket API
@@ -139,19 +139,6 @@ export class ApiConstruct extends Construct {
       }),
     );
 
-    // const listWorkspaceLambda = new Function(this, "ListWorkspaceLambda", {
-    //   code: Code.fromAsset(join(__dirname, "../../../lambda/etl")),
-    //   handler: "list_workspace.lambda_handler",
-    //   runtime: Runtime.PYTHON_3_12,
-    //   timeout: Duration.minutes(15),
-    //   memorySize: 512,
-    //   architecture: Architecture.X86_64,
-    //   environment: {
-    //     USER_POOL_ID: props.userPool.userPoolId,
-    //   },
-    // });
-    //
-    // listWorkspaceLambda.addToRolePolicy(this.iamHelper.cognitoStatement);
 
 
     // Define the API Gateway
@@ -174,7 +161,7 @@ export class ApiConstruct extends Construct {
         allowOrigins: apigw.Cors.ALL_ORIGINS,
       },
       deployOptions: {
-        stageName: "prod",
+        stageName: "api",
         metricsEnabled: true,
         loggingLevel: apigw.MethodLoggingLevel.INFO,
         dataTraceEnabled: true,
@@ -189,7 +176,7 @@ export class ApiConstruct extends Construct {
 
     // Define the API Gateway Lambda Integration with proxy and no integration responses
     const lambdaEmbeddingIntegration = new apigw.LambdaIntegration(
-      embeddingLambda,
+      restApiHandlerFn,
       { proxy: true },
     );
 

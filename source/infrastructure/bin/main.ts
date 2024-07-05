@@ -80,15 +80,15 @@ export class RootStack extends Stack {
     uiExports.node.addDependency(uiPortal);
 
 
-    new CfnOutput(this, "API Endpoint Address", {
+    new CfnOutput(this, "RestAPIEndpoint", {
       value: apiConstruct.apiEndpoint,
     });
     // new CfnOutput(this, "VPC", { value: vpcConstruct.connectorVpc.vpcId });
-    new CfnOutput(this, "WebPortalURL", {
+    new CfnOutput(this, "AdminPortalURL", {
       value: uiPortal.portalUrl,
       description: "admin portal url",
     });
-    new CfnOutput(this, "WebSocket Endpoint Address", {
+    new CfnOutput(this, "WebSocketAPIEndpoint", {
       value: apiConstruct.wsEndpoint,
     });
     new CfnOutput(this, "OidcClientId", {

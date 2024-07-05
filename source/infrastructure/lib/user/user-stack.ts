@@ -63,13 +63,13 @@ export class UserConstruct extends Construct {
 
     // Add UserPoolClient
     const userPoolClient = this.userPool.addClient('UserPoolClient', {
-      userPoolClientName: Constants.SOLUTION_SHORT_NAME,
+      userPoolClientName: Constants.SOLUTION_NAME,
       authFlows: {
         userSrp: true,
         userPassword: true,
       },
       oAuth: {
-        callbackUrls: [`https://${props.callbackUrl}/signin`],
+        callbackUrls: [`https://${props.callbackUrl}/signin`, 'http://localhost:5173/signin'],
         logoutUrls: [`https://${props.callbackUrl}`],
         scopes: [OAuthScope.OPENID, OAuthScope.PROFILE, OAuthScope.EMAIL],
       },

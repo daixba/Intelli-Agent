@@ -11,14 +11,40 @@
  *  and limitations under the License.                                                                                *
  *********************************************************************************************************************/
 
-import { LayerVersion, Runtime, Code } from "aws-cdk-lib/aws-lambda";
+import {Code, LayerVersion, Runtime} from "aws-cdk-lib/aws-lambda";
 import * as path from "path";
-import { Construct } from "constructs";
-import { BuildConfig } from "./build-config";
+import {Construct} from "constructs";
+import {BuildConfig} from "./build-config";
 import * as pyLambda from "@aws-cdk/aws-lambda-python-alpha";
+import {Constants} from "./constants";
 
 export class LambdaLayers {
   constructor(private scope: Construct) { }
+
+  createAPIDefaultLayer() {
+      return new LayerVersion(
+        this.scope,
+        "APIDefaultLambdaLayer",
+        {
+            code: Code.fromAsset(
+                path.join(__dirname, "../../../lambda/api"),
+                {
+                    bundling: {
+                        image: Runtime.PYTHON_3_12.bundlingImage,
+                        command: [
+                            "bash",
+                            "-c",
+                            `pip install -r requirements.txt ${BuildConfig.LAYER_PIP_OPTION} -t /asset-output/python`,
+                        ],
+                    },
+                },
+            ),
+            compatibleRuntimes: [Runtime.PYTHON_3_12],
+            description: `${Constants.SOLUTION_NAME} - Default API layer`,
+        },
+    );
+  }
+
 
   createEmbeddingLayer() {
     const LambdaEmbeddingLayer = new LayerVersion(
