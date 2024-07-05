@@ -29,7 +29,7 @@ export class UserConstruct extends Construct {
     super(scope, id);
 
     this.userPool = new UserPool(this, 'UserPool', {
-      userPoolName: `${Constants.SOLUTION_NAME}_UserPool`,
+      userPoolName: `${Constants.SOLUTION_SHORT_NAME}_UserPool`,
       selfSignUpEnabled: false,
       signInCaseSensitive: false,
       accountRecovery: AccountRecovery.EMAIL_ONLY,
@@ -57,13 +57,13 @@ export class UserConstruct extends Construct {
     const userPoolDomain = new UserPoolDomain(this, 'UserPoolDomain', {
       userPool: this.userPool,
       cognitoDomain: {
-        domainPrefix: `${Constants.SOLUTION_NAME.toLowerCase()}-${Aws.ACCOUNT_ID}`,
+        domainPrefix: `${Constants.SOLUTION_SHORT_NAME.toLowerCase()}-${Aws.ACCOUNT_ID}`,
       },
     });
 
     // Add UserPoolClient
     const userPoolClient = this.userPool.addClient('UserPoolClient', {
-      userPoolClientName: Constants.SOLUTION_NAME,
+      userPoolClientName: Constants.SOLUTION_SHORT_NAME,
       authFlows: {
         userSrp: true,
         userPassword: true,

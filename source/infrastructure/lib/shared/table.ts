@@ -12,7 +12,7 @@
  *********************************************************************************************************************/
 
 import { RemovalPolicy } from "aws-cdk-lib";
-import { Attribute, BillingMode, Table, TableEncryption } from 'aws-cdk-lib/aws-dynamodb';
+import { Attribute, BillingMode, Table, TableEncryption, CfnTable } from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from "constructs";
 
 export class DynamoDBTable extends Construct {
@@ -28,5 +28,7 @@ export class DynamoDBTable extends Construct {
       encryption: TableEncryption.AWS_MANAGED,
       removalPolicy: RemovalPolicy.DESTROY,
     });
+    const cfnTable = this.table.node.defaultChild as CfnTable;
+    cfnTable.overrideLogicalId(name);
   }
 }

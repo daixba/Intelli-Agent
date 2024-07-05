@@ -36,48 +36,34 @@ dotenv.config();
 export class RootStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps = {}) {
     super(scope, id, props);
-    this.templateOptions.description = "(SO8034) - Intelli-Agent";
+    this.templateOptions.description = "AI Customer Service";
 
     this.setBuildConfig();
 
     const cdkParameters = new DeploymentParameters(this);
     const iamHelper = new IAMHelper(this, "iam-helper");
 
-    const vpcConstruct = new VpcConstruct(this, "vpc-construct");
+    const dynamoDBConstruct = new DynamoDBConstruct(this, "ddb");
 
-    const aosConstruct = new AOSConstruct(this, "aos-construct", {
-      osVpc: vpcConstruct.connectorVpc,
-      securityGroup: vpcConstruct.securityGroup,
-    });
-    aosConstruct.node.addDependency(vpcConstruct);
+    const uiPortal = new PortalConstruct(this, "ui");
 
-    const dynamoDBConstruct = new DynamoDBConstruct(this, "ddb-construct");
-
-
-    const uiPortal = new PortalConstruct(this, "ui-construct");
-
-    const userConstruct = new UserConstruct(this, "user", {
+    const userConstruct = new UserConstruct(this, "auth", {
       adminEmail: cdkParameters.subEmail.valueAsString,
       callbackUrl: uiPortal.portalUrl,
     });
 
-    const apiConstruct = new ApiConstruct(this, "api-construct", {
-      apiVpc: vpcConstruct.connectorVpc,
-      securityGroup: vpcConstruct.securityGroup,
-      domainEndpoint: aosConstruct.domainEndpoint || "",
+    const apiConstruct = new ApiConstruct(this, "api", {
+      domainEndpoint: "",
       embeddingAndRerankerEndPoint: "",
       llmModelId: BuildConfig.LLM_MODEL_ID,
       instructEndPoint: "",
-      sessionsTableName: dynamoDBConstruct.sessionTableName,
-      messagesTableName: dynamoDBConstruct.messageTableName,
-      promptTableName: dynamoDBConstruct.promptTableName,
-      workspaceTableName: "",
+      sessionsTableName: dynamoDBConstruct.sessionTable.tableName,
+      messagesTableName: dynamoDBConstruct.messageTable.tableName,
+      botTableName: dynamoDBConstruct.botTable.tableName,
       userPool: userConstruct.userPool,
       userPoolClientId: userConstruct.oidcClientId,
       iamHelper: iamHelper,
     });
-    apiConstruct.node.addDependency(vpcConstruct);
-    apiConstruct.node.addDependency(aosConstruct);
 
 
     const uiExports = new UiExportsConstruct(this, "ui-exports", {
@@ -97,10 +83,10 @@ export class RootStack extends Stack {
     new CfnOutput(this, "API Endpoint Address", {
       value: apiConstruct.apiEndpoint,
     });
-    new CfnOutput(this, "VPC", { value: vpcConstruct.connectorVpc.vpcId });
+    // new CfnOutput(this, "VPC", { value: vpcConstruct.connectorVpc.vpcId });
     new CfnOutput(this, "WebPortalURL", {
       value: uiPortal.portalUrl,
-      description: "LLM-Bot web portal url",
+      description: "admin portal url",
     });
     new CfnOutput(this, "WebSocket Endpoint Address", {
       value: apiConstruct.wsEndpoint,
@@ -133,7 +119,7 @@ const devEnv = {
 };
 
 const app = new App();
-const stackName = app.node.tryGetContext("StackName") || "intelli-agent";
+const stackName = app.node.tryGetContext("StackName") || "ai-customer-service";
 new RootStack(app, stackName, { env: devEnv });
 
 app.synth();

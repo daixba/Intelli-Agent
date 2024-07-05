@@ -22,6 +22,7 @@ import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integra
 import { WebSocketLambdaAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 
 import { createBasicLambdaPolicy } from "../shared/utils";
+import {Constants} from "../shared/constants";
 
 interface WebSocketProps extends StackProps {
   dispatcherLambda: lambda.Function;
@@ -62,8 +63,8 @@ export class WebSocketConstruct extends Construct {
       timeout: Duration.minutes(15),
     });
 
-    const webSocketApi = new apigwv2.WebSocketApi(this, "wsApi", {
-      description: "LLM bot WebSocket API",
+    const webSocketApi = new apigwv2.WebSocketApi(this, `${Constants.SOLUTION_SHORT_NAME.toLowerCase()}-ws-api`, {
+      description: `${Constants.SOLUTION_NAME} - WebSocket API`,
       connectRouteOptions: {
         integration: new WebSocketLambdaIntegration(
           "ConnectIntegration",

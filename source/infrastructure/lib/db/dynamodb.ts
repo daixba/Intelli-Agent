@@ -16,16 +16,18 @@ import { Construct } from "constructs";
 import { DynamoDBTable } from "../shared/table";
 
 export class DynamoDBConstruct extends Construct {
-  public sessionTableName: string;
-  public messageTableName: string;
-  public promptTableName: string;
-  public indexTableName: string;
-  public modelTableName: string;
-  public intentionTableName: string;
+  readonly sessionTable: dynamodb.Table;
+  readonly botTable: dynamodb.Table;
+  readonly messageTable: dynamodb.Table;
+  // public promptTableName: string;
+  // public indexTableName: string;
+  // public modelTableName: string;
+  // public intentionTableName: string;
 
   public readonly byUserIdIndex: string = "byUserId";
   public readonly bySessionIdIndex: string = "bySessionId";
   public readonly byTimestampIndex: string = "byTimestamp";
+  public readonly byVersion: string = "byVersion";
 
   constructor(scope: Construct, id: string) {
     super(scope, id);
@@ -38,10 +40,16 @@ export class DynamoDBConstruct extends Construct {
       name: "userId",
       type: dynamodb.AttributeType.STRING,
     }
-    const groupNameAttr = {
-      name: "groupName",
+    const botIdAttr = {
+      name: "botId",
       type: dynamodb.AttributeType.STRING,
     }
+
+    const versionAttr = {
+      name: "version",
+      type: dynamodb.AttributeType.STRING,
+    }
+
     const messageIdAttr = {
       name: "messageId",
       type: dynamodb.AttributeType.STRING,
@@ -50,47 +58,29 @@ export class DynamoDBConstruct extends Construct {
       name: "createTimestamp",
       type: dynamodb.AttributeType.STRING,
     }
-    const sortKeyAttr = {
-      name: "sortKey",
-      type: dynamodb.AttributeType.STRING,
-    }
-    const indexIdAttr = {
-      name: "indexId",
-      type: dynamodb.AttributeType.STRING,
-    }
-    const modelIdAttr = {
-      name: "modelId",
-      type: dynamodb.AttributeType.STRING,
-    }
-    const intentionIdAttr = {
-      name: "intentionId",
-      type: dynamodb.AttributeType.STRING,
-    }
 
-    const sessionsTable = new DynamoDBTable(this, "Session", sessionIdAttr, userIdAttr).table;
-    sessionsTable.addGlobalSecondaryIndex({
+
+    this.sessionTable = new DynamoDBTable(this, "SessionTable", sessionIdAttr, userIdAttr).table;
+    this.sessionTable.addGlobalSecondaryIndex({
       indexName: this.byTimestampIndex,
       partitionKey: userIdAttr,
       sortKey: timestampAttr,
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    const messagesTable = new DynamoDBTable(this, "Message", messageIdAttr, sessionIdAttr).table;
-    messagesTable.addGlobalSecondaryIndex({
+    this.messageTable = new DynamoDBTable(this, "MessageTable", messageIdAttr, sessionIdAttr).table;
+    this.messageTable.addGlobalSecondaryIndex({
       indexName: this.bySessionIdIndex,
       partitionKey: { name: "sessionId", type: dynamodb.AttributeType.STRING },
     });
 
-    const promptTable = new DynamoDBTable(this, "Prompt", userIdAttr, sortKeyAttr).table;
-    const indexTable = new DynamoDBTable(this, "Index", groupNameAttr, indexIdAttr).table;
-    const modelTable = new DynamoDBTable(this, "Model", groupNameAttr, modelIdAttr).table;
-    const intentionTable = new DynamoDBTable(this, "Intention", groupNameAttr, intentionIdAttr).table;
+    this.botTable = new DynamoDBTable(this, "BotTable", botIdAttr, versionAttr).table;
+    this.botTable.addGlobalSecondaryIndex({
+      indexName: this.byVersion,
+      partitionKey: versionAttr,
+      sortKey: botIdAttr,
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
 
-    this.sessionTableName = sessionsTable.tableName;
-    this.messageTableName = messagesTable.tableName;
-    this.promptTableName = promptTable.tableName;
-    this.indexTableName = indexTable.tableName;
-    this.modelTableName = modelTable.tableName;
-    this.intentionTableName = intentionTable.tableName;
   }
 }

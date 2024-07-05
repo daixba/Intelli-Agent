@@ -14,6 +14,7 @@
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
 import * as dotenv from "dotenv";
+import {Constants} from "./constants";
 
 dotenv.config();
 
@@ -25,16 +26,16 @@ export class VpcConstruct extends Construct {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    this.connectorVpc = new ec2.Vpc(this, "LLM-VPC", {
-      ipAddresses: ec2.IpAddresses.cidr("10.100.0.0/16"),
+    this.connectorVpc = new ec2.Vpc(this, "VPC", {
+      ipAddresses: ec2.IpAddresses.cidr("10.101.0.0/16"),
       maxAzs: 2,
     });
 
     this.privateSubnets = this.connectorVpc.privateSubnets;
 
-    this.securityGroup = new ec2.SecurityGroup(this, "LLM-VPC-SG", {
+    this.securityGroup = new ec2.SecurityGroup(this, "Default-SG", {
       vpc: this.connectorVpc,
-      description: "LLM Security Group",
+      description: "Default Security Group",
     });
 
     this.securityGroup.addIngressRule(
@@ -47,10 +48,5 @@ export class VpcConstruct extends Construct {
       service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
     });
 
-    this.connectorVpc.addInterfaceEndpoint("Glue", {
-      service: ec2.InterfaceVpcEndpointAwsService.GLUE,
-      securityGroups: [this.securityGroup],
-      subnets: { subnets: this.privateSubnets },
-    });
   }
 }
