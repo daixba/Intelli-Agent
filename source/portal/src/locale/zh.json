@@ -1,7 +1,7 @@
 {
   "translation": {
-    "name": "Intelli-Agent",
-    "welcome": "欢迎使用 Intelli-Agent",
+    "name": "AI Customer Service",
+    "welcome": "欢迎使用 AI 客服",
     "you": "你",
     "welcomeMessage": "您好，我今天有什么可以帮助您？",
     "server": "服务器",
@@ -74,7 +74,7 @@
     "promptDeleteTips": "删除此提示词将会恢复成系统默认提示词。",
     "endPoint": "端点",
     "button": {
-      "login": "登录到 AWS 大语言模型机器人",
+      "login": "登录到管理控制台",
       "reload": "重新加载",
       "send": "发送",
       "modelSettings": "模型设置",
