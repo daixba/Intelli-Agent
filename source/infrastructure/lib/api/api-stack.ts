@@ -35,12 +35,12 @@ import { JsonSchemaType, JsonSchemaVersion, Model } from "aws-cdk-lib/aws-apigat
 
 
 interface ApiStackProps extends StackProps {
-  domainEndpoint: string;
-  embeddingAndRerankerEndPoint: string;
-  llmModelId: string;
-  instructEndPoint: string;
-  sessionsTableName: string;
-  messagesTableName: string;
+  // domainEndpoint: string;
+  // embeddingAndRerankerEndPoint: string;
+  // llmModelId: string;
+  // instructEndPoint: string;
+  sessionTableName: string;
+  messageTableName: string;
   botTableName: string;
   userPool: UserPool;
   userPoolClientId: string;
@@ -57,9 +57,8 @@ export class ApiConstruct extends Construct {
     super(scope, id);
 
     this.iamHelper = props.iamHelper;
-    const domainEndpoint = props.domainEndpoint;
-    const sessionsTableName = props.sessionsTableName;
-    const messagesTableName = props.messagesTableName;
+    const sessionTableName = props.sessionTableName;
+    const messageTableName = props.messageTableName;
     const botTableName = props.botTableName;
 
     const queueConstruct = new QueueConstruct(this, "LLMQueueStack", {
@@ -71,8 +70,8 @@ export class ApiConstruct extends Construct {
 
     const lambdaLayers = new LambdaLayers(this);
     const apiDefaultLayer = lambdaLayers.createAPIDefaultLayer();
-    const apiLambdaOnlineSourceLayer = lambdaLayers.createOnlineSourceLayer();
-    const apiLambdaJobSourceLayer = lambdaLayers.createJobSourceLayer();
+    const agentFlowLayer = lambdaLayers.createAgentFlowLayer();
+    // const apiLambdaJobSourceLayer = lambdaLayers.createJobSourceLayer();
     const apiLambdaAuthorizerLayer = lambdaLayers.createAuthorizerLayer();
 
 
@@ -89,7 +88,12 @@ export class ApiConstruct extends Construct {
       // securityGroups: [securityGroup],
       architecture: Architecture.X86_64,
       environment: {
-        REGION: Aws.REGION,
+        // REGION: Aws.REGION,
+        SESSION_TABLE_NAME: sessionTableName,
+        MESSAGE_TABLE_NAME: messageTableName,
+        BOT_TABLE_NAME: botTableName,
+        AOS_DOMAIN_NAME: "smartsearch",
+        AOS_SECRET_NAME: "opensearch-master-user"
       },
       layers: [apiDefaultLayer],
     });
@@ -101,6 +105,7 @@ export class ApiConstruct extends Construct {
           "es:ESHttpPut",
           "es:ESHttpPost",
           "es:ESHttpHead",
+          "es:DescribeDomain",
         ],
         effect: iam.Effect.ALLOW,
         resources: ["*"],
@@ -168,6 +173,7 @@ export class ApiConstruct extends Construct {
         tracingEnabled: true,
       },
     });
+    api.node.tryRemoveChild("Endpoint")
 
     const auth = new apigw.RequestAuthorizer(this, 'ApiAuthorizer', {
       handler: customAuthorizerLambda,
@@ -226,11 +232,11 @@ export class ApiConstruct extends Construct {
     })
 
 
-    const lambdaOnlineMain = new Function(this, "lambdaOnlineMain", {
+    const agentHandlerFn = new Function(this, "AgentHandlerFn", {
       runtime: Runtime.PYTHON_3_12,
       handler: "main.lambda_handler",
       code: Code.fromAsset(
-        join(__dirname, "../../../lambda/online/lambda_main"),
+        join(__dirname, "../../../lambda/agent-flow"),
       ),
       timeout: Duration.minutes(15),
       memorySize: 4096,
@@ -240,24 +246,30 @@ export class ApiConstruct extends Construct {
       // },
       // securityGroups: [securityGroup],
       architecture: Architecture.X86_64,
-      layers: [apiLambdaOnlineSourceLayer, apiLambdaJobSourceLayer],
+      layers: [agentFlowLayer],
       environment: {
-        aos_endpoint: domainEndpoint,
-        rerank_endpoint: props.embeddingAndRerankerEndPoint,
-        sessions_table_name: sessionsTableName,
-        messages_table_name: messagesTableName,
-        workspace_table: botTableName,
+        SESSION_TABLE_NAME: sessionTableName,
+        MESSAGE_TABLE_NAME: messageTableName,
+        BOT_TABLE_NAME: botTableName,
+        AOS_DOMAIN_NAME: "smartsearch",
+        AOS_SECRET_NAME: "opensearch-master-user"
+        // aos_endpoint: domainEndpoint,
+        // rerank_endpoint: props.embeddingAndRerankerEndPoint,
+        // sessions_table_name: sessionsTableName,
+        // messages_table_name: messagesTableName,
+        // workspace_table: botTableName,
         // openai_key_arn: openAiKey.secretArn,
       },
     });
 
-    lambdaOnlineMain.addToRolePolicy(
+    agentHandlerFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
           "es:ESHttpGet",
           "es:ESHttpPut",
           "es:ESHttpPost",
           "es:ESHttpHead",
+          "es:DescribeDomain",
           "secretsmanager:GetSecretValue",
           "bedrock:*",
           "lambda:InvokeFunction",
@@ -266,19 +278,19 @@ export class ApiConstruct extends Construct {
         resources: ["*"],
       }),
     );
-    lambdaOnlineMain.addToRolePolicy(sqsStatement);
-    lambdaOnlineMain.addEventSource(
+    agentHandlerFn.addToRolePolicy(sqsStatement);
+    agentHandlerFn.addEventSource(
       new lambdaEventSources.SqsEventSource(messageQueue, { batchSize: 1 }),
     );
-    lambdaOnlineMain.addToRolePolicy(this.iamHelper.s3Statement);
-    lambdaOnlineMain.addToRolePolicy(this.iamHelper.endpointStatement);
-    lambdaOnlineMain.addToRolePolicy(this.iamHelper.dynamodbStatement);
+    agentHandlerFn.addToRolePolicy(this.iamHelper.s3Statement);
+    agentHandlerFn.addToRolePolicy(this.iamHelper.endpointStatement);
+    agentHandlerFn.addToRolePolicy(this.iamHelper.dynamodbStatement);
 
 
 
     // Define the API Gateway Lambda Integration with proxy and no integration responses
     const lambdaExecutorIntegration = new apigw.LambdaIntegration(
-      lambdaOnlineMain,
+      agentHandlerFn,
       { proxy: true },
     );
 
@@ -306,7 +318,7 @@ export class ApiConstruct extends Construct {
 
     const webSocketApi = new WebSocketConstruct(this, "WebSocketApi", {
       dispatcherLambda: lambdaDispatcher,
-      sendMessageLambda: lambdaOnlineMain,
+      sendMessageLambda: agentHandlerFn,
       customAuthorizerLambda: customAuthorizerLambda,
     });
     let wsStage = webSocketApi.websocketApiStage

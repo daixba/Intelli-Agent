@@ -53,12 +53,12 @@ export class RootStack extends Stack {
     });
 
     const apiConstruct = new ApiConstruct(this, "api", {
-      domainEndpoint: "",
-      embeddingAndRerankerEndPoint: "",
-      llmModelId: BuildConfig.LLM_MODEL_ID,
-      instructEndPoint: "",
-      sessionsTableName: dynamoDBConstruct.sessionTable.tableName,
-      messagesTableName: dynamoDBConstruct.messageTable.tableName,
+      // domainEndpoint: "",
+      // embeddingAndRerankerEndPoint: "",
+      // llmModelId: BuildConfig.LLM_MODEL_ID,
+      // instructEndPoint: "",
+      sessionTableName: dynamoDBConstruct.sessionTable.tableName,
+      messageTableName: dynamoDBConstruct.messageTable.tableName,
       botTableName: dynamoDBConstruct.botTable.tableName,
       userPool: userConstruct.userPool,
       userPoolClientId: userConstruct.oidcClientId,

@@ -71,6 +71,30 @@ export class LambdaLayers {
     return LambdaEmbeddingLayer;
   }
 
+  createAgentFlowLayer() {
+      return new LayerVersion(
+        this.scope,
+        "AgentFlowLayer",
+        {
+            code: Code.fromAsset(
+                path.join(__dirname, "../../../lambda/agent-flow"),
+                {
+                    bundling: {
+                        image: Runtime.PYTHON_3_12.bundlingImage,
+                        command: [
+                            "bash",
+                            "-c",
+                            `pip install -r requirements.txt ${BuildConfig.LAYER_PIP_OPTION} -t /asset-output/python`,
+                        ],
+                    },
+                },
+            ),
+            compatibleRuntimes: [Runtime.PYTHON_3_12],
+            description: `${Constants.SOLUTION_NAME} - Agent Flow layer`,
+        },
+    );
+  }
+
 
   createOnlineSourceLayer() {
     const LambdaOnlineSourceLayer = new pyLambda.PythonLayerVersion(
