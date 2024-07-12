@@ -33,15 +33,15 @@ export class DynamoDBConstruct extends Construct {
     super(scope, id);
 
     const sessionIdAttr = {
-      name: "sessionId",
+      name: "session_id",
       type: dynamodb.AttributeType.STRING,
     }
     const userIdAttr = {
-      name: "userId",
+      name: "user_id",
       type: dynamodb.AttributeType.STRING,
     }
     const botIdAttr = {
-      name: "botId",
+      name: "bot_id",
       type: dynamodb.AttributeType.STRING,
     }
 
@@ -51,16 +51,16 @@ export class DynamoDBConstruct extends Construct {
     }
 
     const messageIdAttr = {
-      name: "messageId",
+      name: "message_id",
       type: dynamodb.AttributeType.STRING,
     }
     const timestampAttr = {
-      name: "createTimestamp",
+      name: "created_at",
       type: dynamodb.AttributeType.STRING,
     }
 
 
-    this.sessionTable = new DynamoDBTable(this, "SessionTable", sessionIdAttr, userIdAttr).table;
+    this.sessionTable = new DynamoDBTable(this, "Session", sessionIdAttr, userIdAttr).table;
     this.sessionTable.addGlobalSecondaryIndex({
       indexName: this.byTimestampIndex,
       partitionKey: userIdAttr,
@@ -68,13 +68,13 @@ export class DynamoDBConstruct extends Construct {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    this.messageTable = new DynamoDBTable(this, "MessageTable", messageIdAttr, sessionIdAttr).table;
+    this.messageTable = new DynamoDBTable(this, "Message", messageIdAttr, sessionIdAttr).table;
     this.messageTable.addGlobalSecondaryIndex({
       indexName: this.bySessionIdIndex,
-      partitionKey: { name: "sessionId", type: dynamodb.AttributeType.STRING },
+      partitionKey: sessionIdAttr,
     });
 
-    this.botTable = new DynamoDBTable(this, "BotTable", botIdAttr, versionAttr).table;
+    this.botTable = new DynamoDBTable(this, "Bot", botIdAttr, versionAttr).table;
     this.botTable.addGlobalSecondaryIndex({
       indexName: this.byVersion,
       partitionKey: versionAttr,

@@ -77,7 +77,7 @@ export class LambdaLayers {
         "AgentFlowLayer",
         {
             code: Code.fromAsset(
-                path.join(__dirname, "../../../lambda/agent-flow"),
+                path.join(__dirname, "../../../lambda/layer/agent-flow"),
                 {
                     bundling: {
                         image: Runtime.PYTHON_3_12.bundlingImage,
