@@ -106,6 +106,9 @@ export class ApiConstruct extends Construct {
           "es:ESHttpPost",
           "es:ESHttpHead",
           "es:DescribeDomain",
+          "dynamodb:*",
+          "secretsmanager:*",
+          "bedrock:*"
         ],
         effect: iam.Effect.ALLOW,
         resources: ["*"],
