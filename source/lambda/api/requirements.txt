@@ -1,3 +1,13 @@
 aws-lambda-powertools
 pydantic>=2.0.3
 aws_xray_sdk
+langchain==0.2.4
+httpx==0.26.0
+langgraph==0.0.68
+langchain_openai==0.1.8
+langchain_community==0.2.4
+langchainhub==0.1.14
+opensearch-py==2.2.0
+requests_aws4auth==1.2.2
+validators==0.28.3
+openpyxl==3.1.3
