@@ -2,11 +2,14 @@ import boto3
 import os
 import base64
 from botocore.exceptions import ClientError
+from aws_lambda_powertools import Logger
+
+logger = Logger()
 
 region = os.environ.get("AWS_REGION")
 
 def get_secret_value(bot_secret_name: str):
-    print("Getting secret...")
+    logger.info("Getting secret...")
     secret_name = bot_secret_name
     region_name = region
 

@@ -1,23 +1,14 @@
 import json
-import requests
 import os
-
-from langchain.docstore.document import Document
-from langchain_community.vectorstores import OpenSearchVectorSearch
-from langchain_community.vectorstores.opensearch_vector_search import (
-    OpenSearchVectorSearch,
-)
-from opensearchpy import RequestsHttpConnection
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from utils.embedding_util import OpenSearchIngestionWorker, getEmbeddingFunction
-from utils.ddb_util import get_table_item
 from utils.secret_util import get_secret_value
-from requests.auth import HTTPBasicAuth
 from utils.aos_util import AOSUtil
+from model.model import Intention, BotVersion, Pagination
+from utils.common import paginate_list
 
 opensearch_endpoint = os.environ.get("OPENSEARCH_ENDPOINT", "")
 secret_name = os.environ.get('AOS_SECRET_NAME')
@@ -31,54 +22,18 @@ secret = json.loads(get_secret_value(secret_name))
 username = secret.get("username")
 password = secret.get("password")
 
-# TODO: add pydantic model
 @app.post("/v1/bots/<bot_id>/intentions")
 @tracer.capture_method
-def post_intention(bot_id: str):
+def create_intention(bot_id: str):
     body: dict = app.current_event.json_body
+    logger.info(body)
+    intention_body = Intention(question=body['question'], answer=body['answer'])
+    logger.info(intention_body.model_dump())
 
-    item = get_table_item(id=bot_id, version="v1")
-    intention_retrievers = item.get("intention_retrievers")
-
-    index = intention_retrievers[0].get("index")
-    print("index")
-    print(index)
-
-    embedding = intention_retrievers[0].get("embedding")
-    model_type = embedding.get("type")
-    print("model_type")
-    print(model_type)
-
-    model_id = embedding.get("model_id")
-    print("model_id")
-    print(model_id)
+    aos_util = AOSUtil()
     
-    question = body.get("question")
-    answer = body.get("answer")
-    intention = answer.get("intent", "")
-    keyword_argument = answer.get("kwargs","")
-    
-    doc = Document(page_content=question, metadata={'content_type': 'paragraph', 'heading_hierarchy': {'size': 1}, 'file_path': 'balabala', 'keywords': [], 'summary': '', 'jsonlAnswer': {'intent': intention, 'kwargs': keyword_argument}})
- 
-    embedding_function = getEmbeddingFunction(
-        region,
-        model_id
-    )
-    
-    docsearch = OpenSearchVectorSearch(
-        index_name=index,
-        embedding_function=embedding_function,
-        opensearch_url=opensearch_endpoint,
-        http_auth=(username, password),
-        timeout=300,
-        use_ssl=True,
-        verify_certs=True,
-        connection_class=RequestsHttpConnection,
-    )
-    
-    ingestion_worker = OpenSearchIngestionWorker(docsearch, model_id)
-    ingestion_worker.aos_ingestion([doc])
-    print("ingested")
+    aos_util.add_doc(bot_id, intention_body)
+    logger.info("ingested")
 
     return {
         'statusCode': 200,
@@ -90,55 +45,29 @@ def post_intention(bot_id: str):
 @tracer.capture_method
 def get_intention(bot_id: str):
     body: dict = app.current_event.json_body
-    print(body)
+    logger.info(body)
+    pagination_body = Pagination(page=body['page'], size=body['size'])
+    logger.info(pagination_body.model_dump())
 
-    aos_util = AOSUtil(bot_id,"v1")
+    page = pagination_body.page
+    size = pagination_body.size
+
+    aos_util = AOSUtil()
     
-    response = aos_util.list_doc()
+    intention_list = aos_util.list_doc(bot_id, BotVersion.TEST)
     
-    list = []
-    if response.status_code == 200:
-        result = response.json()
-        hits = result.get("hits")
-        if len(hits) == 0:
-            return {
-                'statusCode': 200,
-                'body': "Empty Index"
-            }
-        
-        for hit in hits.get("hits"):
-            dict={}
-            dict["_id"] = hit.get("_id")
-            source=hit.get("_source")
-            dict["text"] = source.get("text")
-            meta=source.get("metadata")
-            jsonlAnswer=meta.get("jsonlAnswer")
-            dict["intent"] = jsonlAnswer.get("intent")
-            dict["kwargs"] = jsonlAnswer.get("kwargs")
-            print(dict)
-            list.append(dict)
-        print(list)
-        return {
-            'statusCode': 200,
-            'body': list
-        }
-    else:
-        print(f"Failed to retrieve documents: {response.status_code} - {response.text}")
-        return {
-            'statusCode': response.status_code,
-            'body': response.text
-        }
+    return paginate_list(intention_list, page, size)
 
 
 @app.post("/v1/bots/<bot_id>/intentions/<intention_id>")
 @tracer.capture_method
 def update_intention(bot_id: str, intention_id: str):    
     body: dict = app.current_event.json_body
-    print(body)
+    logger.info(body)
 
-    aos_util = AOSUtil(bot_id,"v1")
+    aos_util = AOSUtil()
 
-    aos_util.update_doc(body, intention_id)
+    aos_util.update_doc(bot_id, BotVersion.TEST, body, intention_id)
 
     return {
         'statusCode': 200,
@@ -150,11 +79,11 @@ def update_intention(bot_id: str, intention_id: str):
 @tracer.capture_method
 def delete_intention(bot_id: str, intention_id: str):    
     body: dict = app.current_event.json_body
-    print(body)
+    logger.info(body)
 
-    aos_util = AOSUtil(bot_id,"v1")
+    aos_util = AOSUtil()
     
-    aos_util.delete_doc(intention_id)
+    aos_util.delete_doc(bot_id, BotVersion.TEST, intention_id)
     
     return {
         'statusCode': 200,
