@@ -19,7 +19,7 @@ from common_logic.common_utils.logger_utils import get_logger
 from common_logic.common_utils.serialization_utils import JSONEncoder
 from tools.tool_base import Tool, get_tool_by_name, tool_manager
 from langgraph.graph import END, StateGraph
-from agent_base import build_agent_graph, tool_execution
+from utils.agent_base import build_agent_graph, tool_execution
 
 from common_logic.common_utils.constant import (
     LLMTaskType,
