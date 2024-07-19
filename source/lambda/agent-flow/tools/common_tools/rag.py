@@ -7,7 +7,6 @@ from common_logic.common_utils.lambda_invoke_utils import send_trace
 
 
 def lambda_handler(event_body, context=None):
-    print("RAG ", ">" * 20)
     state = event_body['state']
 
     context_list = []
@@ -58,7 +57,7 @@ def lambda_handler(event_body, context=None):
             "intent_type": LLMTaskType.RAG,
         },
         "llm_input": {
-            "contexts": [state["contexts"]],
+            "contexts": context_list,
             "query": state["query"],
             "chat_history": state["chat_history"],
         },
@@ -67,8 +66,7 @@ def lambda_handler(event_body, context=None):
     for prompt in prompts:
         if prompt["type"] == "RAG":
             rag_event_body["llm_config"]["system_prompt"] = prompt["text"]
-    print("RAG ", "*" * 20)
-    print(rag_event_body)
+            
     output: str = invoke_lambda(
         lambda_name="Online_LLM_Generate",
         lambda_module_path="lambda_llm_generate.llm_generate",

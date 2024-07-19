@@ -398,6 +398,8 @@ def run(event_body):
     enable_trace = event_body.get("enable_trace", True)
     # get all registered tools with parameters
     # valid_tool_calling_names = tool_manager.get_names_from_tools_with_parameters()
+    for retriever in chatbot_config["knowledge_base_retrievers"]:
+        tool_manager.register_rag_tool(retriever["name"], retriever["description"])
 
     # invoke graph and get results
     response = app.invoke(
@@ -442,8 +444,8 @@ if __name__ == '__main__':
             "description": "Test Bot",
             "knowledge_base_retrievers": [
                 {
-                    "name": "host-rag",
-                    "description": "",
+                    "name": "QA",
+                    "description": "Answer question based on search result",
                     "index": "test-qa",
                     "config": {
                         "top_k": "3",
