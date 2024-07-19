@@ -270,6 +270,7 @@ def give_rhetorical_question(state: ChatbotState):
     return {"answer": recent_tool_calling["kwargs"]["question"]}
 
 
+@node_monitor_wrapper
 def give_final_response(state: ChatbotState):
     recent_tool_calling: list[dict] = state["current_tool_calls"][0]
     # give_rhetorical_question
@@ -277,8 +278,6 @@ def give_final_response(state: ChatbotState):
         answer = recent_tool_calling["kwargs"]["question"]
     elif "response" in recent_tool_calling["kwargs"].keys():
         answer = recent_tool_calling["kwargs"]["response"]
-    elif "abbr" in recent_tool_calling["kwargs"].keys():
-        answer = recent_tool_calling["kwargs"]["abbr"]
     else:
         answer = format_reply(state)["answer"]
     return {"answer": answer}
@@ -320,7 +319,7 @@ def agent_route(state: dict):
     # if state["agent_recursion_validation"] and not state["parse_tool_calling_ok"]:
     #     return "invalid tool calling"
     if state["agent_recursion_validation"]:
-        if state["current_tool_name"] in ["QA", "service_availability", "explain_abbr"]:
+        if state["current_tool_name"] in ["QA"]:
             return "force to retrieve all knowledge"
         elif state["current_tool_name"] in state["valid_tool_calling_names"]:
             return "valid tool calling"
@@ -336,9 +335,11 @@ def rag_all_index_lambda_route(state: dict):
     #     return "generate results in rag mode"
 
     # if not state.get('intention_fewshot_examples', []) and state['current_agent_recursion_num'] == 0:
-    # if state['current_agent_recursion_num'] == 0:
+    #     # if state['current_agent_recursion_num'] == 0:
     #     return "no clear intention"
     # else:
+    #     return "generate results in rag mode"
+
     return "generate results in rag mode"
 
 
@@ -500,12 +501,12 @@ def run(event_body):
 
     chatbot_config = event_body["chatbot_config"]
     query = event_body["query"]
-    use_history = event_body.get("use_history", "true").lower() == "true"
-    chat_history = event_body["chat_history"] if use_history else []
-    stream = event_body["stream"]
+    use_history = event_body.get("use_history", True)
+    chat_history = event_body.get("chat_history", []) if use_history else []
+    stream = event_body.get("stream", True)
     message_id = event_body["custom_message_id"]
     ws_connection_id = event_body["ws_connection_id"]
-    enable_trace = event_body.get("enable_trace", "true").lower() == "true"
+    enable_trace = event_body.get("enable_trace", True)
     # get all registered tools with parameters
     valid_tool_calling_names = tool_manager.get_names_from_tools_with_parameters()
 
@@ -535,72 +536,81 @@ def run(event_body):
 if __name__ == '__main__':
     event_body = {
         "query": "Hello",
-        "entry_type": "common",
+        # "entry_type": "common",
+        "user_id": "b85163d0-6011-70fd-216e-d1d6d64f153d",
         "session_id": "cfa48a53-5e6a-4942-a900-639b1b48d7da",
         "use_history": True,
         "enable_trace": True,
         "use_websearch": True,
+        "stream": False,
+        "chat_history": [],
+        "ws_connection_id": None,
+        "custom_message_id": "",
+        "ddb_history_obj": [],
+        "request_timestamp": 1721109343.02637,
         "chatbot_config": {
-            {
-                "bot_id": "a1b2",
-                "version": "TEST",
-                "description": "Test Bot",
-                "knowledge_base_retrievers": [
-                    {
-                        "index": "test-qa",
-                        "config": {
-                            "top_k": "3",
-                            "vector_field_name": "sentence_vector",
-                            "text_field_name": "paragraph",
-                            "source_field_name": "source",
-                            "use_hybrid_search": "true",
-                        },
-                        "embedding": {
-                            "type": "Bedrock",
-                            "model_id": "amazon.titan-embed-text-v2:0"
-                        }
-                    }
-                ],
-                "intention_retrievers": [
-                    {
-                        "index": "test-intent",
-                        "config": {
-                            "top_k": "3"
-                        },
-                        "embedding": {
-                            "type": "Bedrock",
-                            "model_id": "cohere.embed-english-v3"
-                        }
-                    }
-                ],
-                "llm": {
-                    "type": "Bedrock",
-                    "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
-                    "model_kwargs": {
-                        "temperature": 0.0,
-                        "max_tokens": 4096
-                    }
-                },
-                "prompts": [
-                    {
-                        "name": "RAG",
-                        "text": "You are a customer service chatbot. You ALWAYS follow these guidelines when writing your response to user's query:\n<guidelines>\n- NERVER say \"\u6839\u636e\u641c\u7d22\u7ed3\u679c/\u5927\u5bb6\u597d/\u8c22\u8c22...\".\n</guidelines>\n\nHere are some documents for you to reference for your query.\n<docs>\n{context}\n</docs>"},
-                    {
-                        "name": "GENERAL",
-                        "text": "You are a customer service chatbot."
+            "bot_id": "a1b2",
+            "version": "TEST",
+            "description": "Test Bot",
+            "knowledge_base_retrievers": [
+                {
+                    "index": "test-qa",
+                    "config": {
+                        "top_k": "3",
+                        "vector_field_name": "sentence_vector",
+                        "text_field_name": "paragraph",
+                        "source_field_name": "source",
+                        "use_hybrid_search": "true",
                     },
-                    {
-                        "name": "CONV_SUMMARY",
-                        "text": "Given the following conversation between `USER` and `AI`, and a follow up `USER` reply, Put yourself in the shoes of `USER`, rephrase the follow up `USER` reply to be a standalone reply.\n\nChat History:\n{history}\n\nThe USER's follow up reply: {question}"
+                    "embedding": {
+                        "type": "Bedrock",
+                        "model_id": "amazon.titan-embed-text-v2:0"
                     }
-                ],
-                "tools": [
-                    {
-                        "name": "get_weather"
+                }
+            ],
+            "intention_retrievers": [
+                {
+                    "index": "test-intent",
+                    "config": {
+                        "top_k": "3"
+                    },
+                    "embedding": {
+                        "type": "Bedrock",
+                        "model_id": "cohere.embed-english-v3"
                     }
-                ]
-            }
+                }
+            ],
+            "llm": {
+                "type": "Bedrock",
+                "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+                "model_kwargs": {
+                    "temperature": 0.0,
+                    "max_tokens": 4096
+                }
+            },
+            "prompts": [
+                {
+                    "type": "RAG",
+                    "text": "You are a customer service chatbot. You ALWAYS follow these guidelines when writing your response to user's query:\n<guidelines>\n- NERVER say \"\u6839\u636e\u641c\u7d22\u7ed3\u679c/\u5927\u5bb6\u597d/\u8c22\u8c22...\".\n</guidelines>\n\nHere are some documents for you to reference for your query.\n<docs>\n{context}\n</docs>"},
+                {
+                    "type": "GENERAL",
+                    "text": "You are a customer service chatbot."
+                },
+                {
+                    "type": "CONV_SUMMARY",
+                    "text": "Given the following conversation between `USER` and `AI`, and a follow up `USER` reply, Put yourself in the shoes of `USER`, rephrase the follow up `USER` reply to be a standalone reply.\n\nChat History:\n{history}\n\nThe USER's follow up reply: {question}"
+                }
+            ],
+            "tools": [
+                {
+                    "name": "get_weather"
+                },
+                {
+                    "name": "comfort"
+                }
+            ]
         },
-        "user_id": "b85163d0-6011-70fd-216e-d1d6d64f153d"
+
     }
-    run(event_body)
+    resp = run(event_body)
+    print("Final response> ", resp)

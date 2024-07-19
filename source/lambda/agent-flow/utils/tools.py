@@ -199,47 +199,66 @@ tool_manager.register_tool({
     "running_mode": "output"
 })
 
-# tool_manager.register_tool({
-#     "name": "comfort",
-#     "scenario": "common",
-#     "lambda_name": "comfort",
-#     "lambda_module_path": "functions.common_tools.comfort",
-#     "tool_def": {
-#         "name": "comfort",
-#         "description": "comfort user to mitigate their bad emotion",
-#         # "parameters": {
-#         #     "type": "object",
-#         #     "properties": {
-#         #         "response": {
-#         #             "description": "response to users",
-#         #             "type": "string"
-#         #     }},
-#         #     "required": ["response"]
-#         # },
-#     },
-#     "running_mode": "output"
-# })
+tool_manager.register_tool({
+    "name": "comfort",
+    "scenario": "common",
+    "lambda_name": "comfort",
+    "lambda_module_path": "functions.common_tools.comfort",
+    "tool_def": {
+        "name": "comfort",
+        "description": "comfort user to mitigate their bad emotion",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "description": "response to users",
+                    "type": "string"
+                }},
+            "required": ["response"]
+        },
+    },
+    "running_mode": "output"
+})
 
-# tool_manager.register_tool({
-#     "name": "transfer",
-#     "lambda_name": "",
-#     "lambda_module_path": "functions.common_tools.transfer",
-#     "tool_def": {
-#         "name": "transfer",
-#         "description": "transfer the conversation to manual customer service",
-#         # "parameters": {
-#         #     "type": "object",
-#         #     "properties": {
-#         #         "response": {
-#         #             "description": "response to users",
-#         #             "type": "string"
-#         #     }},
-#         #     "required": ["response"]
-#         # },
-#     },
-#     "running_mode": "output"
-# })
+tool_manager.register_tool({
+    "name": "transfer",
+    "lambda_name": "",
+    "lambda_module_path": "functions.common_tools.transfer",
+    "tool_def": {
+        "name": "transfer",
+        "description": "transfer the conversation to manual customer service",
+        # "parameters": {
+        #     "type": "object",
+        #     "properties": {
+        #         "response": {
+        #             "description": "response to users",
+        #             "type": "string"
+        #     }},
+        #     "required": ["response"]
+        # },
+    },
+    "running_mode": "output"
+})
 
+tool_manager.register_tool({
+    "name": "greeting",
+    "lambda_name": "",
+    "lambda_module_path": "functions.common_tools.greeting",
+    "tool_def": {
+        "name": "greeting",
+        "description": "Send greeting back to user and ask: How can I assist you today?",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "description": "response to users",
+                    "type": "string"
+                }},
+            "required": ["response"]
+        },
+    },
+    "running_mode": "output"
+})
 # tool_manager.register_tool({
 #     "name": "转人工",
 #     "lambda_name": "",
