@@ -22,6 +22,8 @@ secret = json.loads(get_secret_value(secret_name))
 username = secret.get("username")
 password = secret.get("password")
 
+aos_util = AOSUtil()
+
 @app.post("/v1/bots/<bot_id>/intentions")
 @tracer.capture_method
 def create_intention(bot_id: str):
@@ -29,8 +31,6 @@ def create_intention(bot_id: str):
     logger.info(body)
     intention_body = Intention(question=body['question'], answer=body['answer'])
     logger.info(intention_body.model_dump())
-
-    aos_util = AOSUtil()
     
     aos_util.add_doc(bot_id, intention_body)
     logger.info("ingested")
@@ -51,8 +51,6 @@ def get_intention(bot_id: str):
 
     page = pagination_body.page
     size = pagination_body.size
-
-    aos_util = AOSUtil()
     
     intention_list = aos_util.list_doc(bot_id, BotVersion.TEST)
     
@@ -64,8 +62,6 @@ def get_intention(bot_id: str):
 def update_intention(bot_id: str, intention_id: str):    
     body: dict = app.current_event.json_body
     logger.info(body)
-
-    aos_util = AOSUtil()
 
     aos_util.update_doc(bot_id, BotVersion.TEST, body, intention_id)
 
@@ -80,8 +76,6 @@ def update_intention(bot_id: str, intention_id: str):
 def delete_intention(bot_id: str, intention_id: str):    
     body: dict = app.current_event.json_body
     logger.info(body)
-
-    aos_util = AOSUtil()
     
     aos_util.delete_doc(bot_id, BotVersion.TEST, intention_id)
     
