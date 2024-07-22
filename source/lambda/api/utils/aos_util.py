@@ -35,6 +35,7 @@ class AOSUtil:
         self
     ):
         self.opensearch_endpoint = self.get_aos_endpoint()
+        self.aos_client = self.get_aos_client(self.opensearch_endpoint, HTTPS_PORT_NUMBER)
 
     def get_aos_endpoint(self):
         aos_client = boto3.client('opensearch')
@@ -91,15 +92,18 @@ class AOSUtil:
 
         intention_list = []
 
-        aos_client = self.get_aos_client(self.opensearch_endpoint, HTTPS_PORT_NUMBER)
-
         search_body = {
             "query": {
                 "match_all": {}
             }
         }
 
-        result = aos_client.search(body=search_body, index=index, params={'size': 999}, headers=headers)
+        result = self.aos_client.search(
+            body=search_body, 
+            index=index, 
+            params={'size': 999}, 
+            headers=headers
+        )
 
         hits = result.get("hits")
         
@@ -119,14 +123,12 @@ class AOSUtil:
     def update_doc(self, bot_id: str, version: str, body: dict, intention_id: str):
 
         index = get_index(bot_id, version)
-
-        aos_client = self.get_aos_client(self.opensearch_endpoint, HTTPS_PORT_NUMBER)
         
         question = body.get("question")
         answer = body.get("answer")
         new_doc = {"doc": {"text": question, "metadata": {"jsonlAnswer": answer}}}
 
-        response = aos_client.update(
+        response = self.aos_client.update(
             index=index,
             id=intention_id,
             body=new_doc
@@ -138,9 +140,7 @@ class AOSUtil:
 
         index = get_index(bot_id, version)
 
-        aos_client = self.get_aos_client(self.opensearch_endpoint, HTTPS_PORT_NUMBER)
-
-        response = aos_client.delete(
+        response = self.aos_client.delete(
             index = index,
             id = intention_id
         )
