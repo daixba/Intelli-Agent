@@ -57,7 +57,7 @@ class ToolManager:
             "lambda_name": LAMBDA_NAME,
             "lambda_module_path": rag.lambda_handler,
             "tool_def": {
-                "name": "QA",
+                "name": name,
                 "description": description,
             },
             "running_mode": ToolRuningMode.ONCE

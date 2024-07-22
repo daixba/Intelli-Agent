@@ -8,6 +8,7 @@ from common_logic.common_utils.lambda_invoke_utils import send_trace
 
 def lambda_handler(event_body, context=None):
     state = event_body['state']
+    tool_name = event_body.get("tool_name", "")
 
     context_list = []
     # add qq match results
@@ -21,12 +22,20 @@ def lambda_handler(event_body, context=None):
     #     lambda_module_path="functions.functions_utils.retriever.retriever",
     #     handler_name="lambda_handler",
     # )
+
+    retrievers = []
+
+    # There could be multiple retrievers, each one is associated with one index
+    for retriever in state["chatbot_config"].get("knowledge_base_retrievers", []):
+        if retriever["name"] == tool_name:
+            retrievers.append(retriever)
+            break
+
     query_key = "query"
     retriever_params = {
         "query": query_key,
-        # **intention_config
         "type": "qd",
-        "intention_retrievers": state["chatbot_config"].get("knowledge_base_retrievers", [])
+        "retrievers": retrievers
     }
     # retriever_params = event_body['tool_init_kwargs']
     output: str = invoke_lambda(
@@ -35,7 +44,6 @@ def lambda_handler(event_body, context=None):
         lambda_module_path="lambda_retriever.retriever",
         handler_name="lambda_handler",
     )
-    print(output)
 
     for doc in output["result"]["docs"]:
         context_list.append(doc["page_content"])
@@ -66,7 +74,7 @@ def lambda_handler(event_body, context=None):
     for prompt in prompts:
         if prompt["type"] == "RAG":
             rag_event_body["llm_config"]["system_prompt"] = prompt["text"]
-            
+
     output: str = invoke_lambda(
         lambda_name="Online_LLM_Generate",
         lambda_module_path="lambda_llm_generate.llm_generate",

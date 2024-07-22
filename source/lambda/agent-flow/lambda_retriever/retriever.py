@@ -44,7 +44,7 @@ def get_bedrock_kb_retrievers(knowledge_base_id_list, top_k: int):
     return retriever_list
 
 
-def get_custom_qd_retrievers(retriever_config, using_bm25=True):
+def get_custom_qd_retrievers(retriever_config, using_bm25=False):
     default_qd_config = {
         "using_whole_doc": False,
         "context_num": 1,
@@ -115,7 +115,7 @@ def lambda_handler(event, context=None):
     event_body = event
     retriever_list = []
     retriever_type = event_body["type"]
-    for retriever_config in event_body["intention_retrievers"]:
+    for retriever_config in event_body["retrievers"]:
         # retriever_type = retriever_config["type"]
         retriever_list.extend(get_custom_retrievers(retriever_config, retriever_type))
 
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         "body":
             json.dumps(
                 {
-                    "intention_retrievers": [
+                    "retrievers": [
                         {
                             "index": "test-intent",
                             "config": {
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         "body":
             json.dumps(
                 {
-                    "intention_retrievers": [
+                    "retrievers": [
                         {
                             "index": "test-qa",
                             "config": {

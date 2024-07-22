@@ -11,9 +11,8 @@ def lambda_handler(state: dict, context=None):
     query_key = "query"
     event_body = {
         "query": state[query_key],
-        # **intention_config
         "type": "qq",
-        "intention_retrievers": state['chatbot_config'].get("intention_retrievers", [])
+        "retrievers": state['chatbot_config'].get("intention_retrievers", [])
     }
     # call retriver
     res: list[dict] = invoke_lambda(
