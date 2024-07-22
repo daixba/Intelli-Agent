@@ -14,6 +14,7 @@ from langchain_community.vectorstores.opensearch_vector_search import (
     OpenSearchVectorSearch
 )
 from opensearchpy import RequestsHttpConnection
+from opensearchpy import OpenSearch
 
 aos_domain_name = os.environ.get("AOS_DOMAIN_NAME", "smartsearch")
 secret_name = os.environ.get('AOS_SECRET_NAME')
@@ -22,6 +23,8 @@ region = os.environ.get("AWS_REGION")
 secret = json.loads(get_secret_value(secret_name))
 username = secret.get("username")
 password = secret.get("password")
+
+HTTPS_PORT_NUMBER = "443"
 
 headers = {'Content-Type': 'application/json'}
 
@@ -32,6 +35,7 @@ class AOSUtil:
         self
     ):
         self.opensearch_endpoint = self.get_aos_endpoint()
+        self.aos_client = self.get_aos_client(self.opensearch_endpoint, HTTPS_PORT_NUMBER)
 
     def get_aos_endpoint(self):
         aos_client = boto3.client('opensearch')
@@ -41,6 +45,16 @@ class AOSUtil:
 
         aos_endpoint = response['DomainStatus']['Endpoint']
         return aos_endpoint
+    
+    def get_aos_client(self, host, port):
+        client = OpenSearch(
+            hosts = [{'host': host, 'port': port}],
+            http_auth = HTTPBasicAuth(username, password),
+            use_ssl = True,
+            verify_certs = True,
+            connection_class=RequestsHttpConnection
+        )
+        return client
 
     def add_doc(self, bot_id: str, body: Intention):
 
@@ -72,19 +86,28 @@ class AOSUtil:
         create_aos_ingestion(model_id, docsearch, [doc])
     
 
-    def list_doc(self, bot_id: str, version: str):
+    def list_doc(self, bot_id: str, version: str, start_from: int, size: int):
 
         index = get_index(bot_id, version)
-        
-        url = f'https://{self.opensearch_endpoint}/{index}/_search'
-        
-        logger.info(url)
-        
-        response = requests.get(url, params={'size': 999}, headers=headers, auth=HTTPBasicAuth(username, password))
 
         intention_list = []
 
-        result = response.json()
+        search_body = {
+            "query": {
+                "match_all": {}
+            }
+        }
+
+        result = self.aos_client.search(
+            body=search_body, 
+            index=index, 
+            params={
+                'from': start_from,
+                'size': size
+            }, 
+            headers=headers
+        )
+
         hits = result.get("hits")
         
         for hit in hits.get("hits"):
@@ -104,22 +127,25 @@ class AOSUtil:
 
         index = get_index(bot_id, version)
         
-        url = f'https://{self.opensearch_endpoint}/{index}/_update/{intention_id}'
-        
         question = body.get("question")
         answer = body.get("answer")
         new_doc = {"doc": {"text": question, "metadata": {"jsonlAnswer": answer}}}
 
-        response = requests.post(url, json=new_doc, headers=headers, auth=HTTPBasicAuth(username, password))
+        response = self.aos_client.update(
+            index=index,
+            id=intention_id,
+            body=new_doc
+        )
 
         return response
 
     def delete_doc(self, bot_id: str, version: str, intention_id: str):
 
         index = get_index(bot_id, version)
-        
-        url = f'https://{self.opensearch_endpoint}/{index}/_doc/{intention_id}'
 
-        response = requests.delete(url, headers=headers, auth=HTTPBasicAuth(username, password))
+        response = self.aos_client.delete(
+            index = index,
+            id = intention_id
+        )
 
         return response
