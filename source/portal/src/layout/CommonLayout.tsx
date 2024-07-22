@@ -142,29 +142,29 @@ const CommonLayout: React.FC<CommonLayoutProps> = ({
                     text: t('chatBot'),
                     href: '/',
                   },
-                  {
-                    type: 'link',
-                    text: t('sessionHistory'),
-                    href: '/sessions',
-                  },
+                  // {
+                  //   type: 'link',
+                  //   text: t('sessionHistory'),
+                  //   href: '/sessions',
+                  // },
                 ],
               },
-              {
-                type: 'section',
-                text: t('settings'),
-                items: [
-                  {
-                    type: 'link',
-                    text: t('docLibrary'),
-                    href: '/library',
-                  },
-                  {
-                    type: 'link',
-                    text: t('prompt'),
-                    href: '/prompts',
-                  },
-                ],
-              },
+              // {
+              //   type: 'section',
+              //   text: t('settings'),
+              //   items: [
+              //     {
+              //       type: 'link',
+              //       text: t('docLibrary'),
+              //       href: '/library',
+              //     },
+              //     {
+              //       type: 'link',
+              //       text: t('prompt'),
+              //       href: '/prompts',
+              //     },
+              //   ],
+              // },
               { type: 'divider' },
               {
                 type: 'link',

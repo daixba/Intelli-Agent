@@ -4,16 +4,10 @@ import Message from './components/Message';
 import useAxiosRequest from 'src/hooks/useAxiosRequest';
 import { useTranslation } from 'react-i18next';
 import {
-  Autosuggest,
   Box,
   Button,
-  ColumnLayout,
-  ExpandableSection,
-  FormField,
-  Input,
   Select,
   SelectProps,
-  SpaceBetween,
   StatusIndicator,
   Textarea,
   Toggle,
@@ -24,14 +18,9 @@ import ConfigContext from 'src/context/config-context';
 import { useAuth } from 'react-oidc-context';
 import {
   LLM_BOT_CHAT_MODE_LIST,
-  LLM_BOT_COMMON_MODEL_LIST,
-  LLM_BOT_RETAIL_MODEL_LIST,
-  SCENARIO_LIST,
-  RETAIL_GOODS_LIST,
 } from 'src/utils/const';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageDataType, SessionMessage } from 'src/types';
-import { isValidJson } from 'src/utils/utils';
 
 interface MessageType {
   type: 'ai' | 'human';
@@ -72,44 +61,19 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
   const [currentAIMessage, setCurrentAIMessage] = useState('');
   const [currentMonitorMessage, setCurrentMonitorMessage] = useState('');
   const [aiSpeaking, setAiSpeaking] = useState(false);
-  const [modelOption, setModelOption] = useState('');
-  const [modelList, setModelList] = useState<SelectProps.Option[]>([]);
   const [chatModeOption, setChatModeOption] = useState<SelectProps.Option>(
     LLM_BOT_CHAT_MODE_LIST[0],
   );
   const [useChatHistory, setUseChatHistory] = useState(true);
   const [enableTrace, setEnableTrace] = useState(true);
   const [showTrace, setShowTrace] = useState(true);
-  const [onlyRAGTool, setOnlyRAGTool] = useState(false);
-  // const [useWebSearch, setUseWebSearch] = useState(false);
-  // const [googleAPIKey, setGoogleAPIKey] = useState('');
-  const [retailGoods, setRetailGoods] = useState<SelectProps.Option>(
-    RETAIL_GOODS_LIST[0],
-  );
-  const [scenario, setScenario] = useState<SelectProps.Option>(
-    SCENARIO_LIST[0],
-  );
+
 
   const [sessionId, setSessionId] = useState(historySessionId);
-  const [workspaceIds, setWorkspaceIds] = useState<any[]>([]);
 
-  const [temperature, setTemperature] = useState<string>('0.01');
-  const [maxToken, setMaxToken] = useState<string>('1000');
-
-  const [endPoint, setEndPoint] = useState('');
-  const [showEndpoint, setShowEndpoint] = useState(false);
-  const [endPointError, setEndPointError] = useState('');
   const [showMessageError, setShowMessageError] = useState(false);
   // const [googleAPIKeyError, setGoogleAPIKeyError] = useState(false);
   const [isMessageEnd, setIsMessageEnd] = useState(false);
-  const [additionalConfig, setAdditionalConfig] = useState('');
-
-  // validation
-  const [modelError, setModelError] = useState('');
-  const [temperatureError, setTemperatureError] = useState('');
-  const [maxTokenError, setMaxTokenError] = useState('');
-  const [modelSettingExpand, setModelSettingExpand] = useState(false);
-  const [additionalConfigError, setAdditionalConfigError] = useState('');
 
   const connectionStatus = {
     [ReadyState.CONNECTING]: 'loading',
@@ -122,18 +86,18 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
   // Define an async function to get the data
   const fetchData = useAxiosRequest();
 
-  const getWorkspaceList = async () => {
-    try {
-      const data = await fetchData({
-        url: 'etl/list-workspace',
-        method: 'get',
-      });
-      setWorkspaceIds(data.workspace_ids);
-    } catch (error) {
-      console.error(error);
-      return [];
-    }
-  };
+  // const getWorkspaceList = async () => {
+  //   try {
+  //     const data = await fetchData({
+  //       url: 'etl/list-workspace',
+  //       method: 'get',
+  //     });
+  //     setWorkspaceIds(data.workspace_ids);
+  //   } catch (error) {
+  //     console.error(error);
+  //     return [];
+  //   }
+  // };
 
   const getSessionHistoryById = async () => {
     try {
@@ -180,7 +144,7 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
     } else {
       setSessionId(uuidv4());
     }
-    getWorkspaceList();
+    // getWorkspaceList();
   }, []);
 
   useEffect(() => {
@@ -259,45 +223,6 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
     if (readyState !== ReadyState.OPEN) {
       return;
     }
-    // validate model settings
-    if (!modelOption.trim()) {
-      setModelError('validation.requireModel');
-      setModelSettingExpand(true);
-      return;
-    }
-    if (!temperature.trim()) {
-      setTemperatureError('validation.requireTemperature');
-      setModelSettingExpand(true);
-      return;
-    }
-    if (!maxToken.trim()) {
-      setMaxTokenError('validation.requireMaxTokens');
-      setModelSettingExpand(true);
-      return;
-    }
-    if (parseInt(maxToken) < 1) {
-      setMaxTokenError('validation.maxTokensRange');
-      setModelSettingExpand(true);
-      return;
-    }
-    if (parseFloat(temperature) < 0.0 || parseFloat(temperature) > 1.0) {
-      setTemperatureError('validation.temperatureRange');
-      setModelSettingExpand(true);
-      return;
-    }
-    // validate endpoint
-    if (modelOption === 'qwen2-72B-instruct' && !endPoint.trim()) {
-      setEndPointError('validation.requireEndPoint');
-      setModelSettingExpand(true);
-      return;
-    }
-
-    // validate additional config
-    if (additionalConfig.trim() && !isValidJson(additionalConfig)) {
-      setAdditionalConfigError('validation.invalidJson');
-      setModelSettingExpand(true);
-      return;
-    }
 
     setUserMessage('');
     setAiSpeaking(true);
@@ -310,44 +235,15 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
     // }
     let message = {
       query: userMessage,
-      entry_type: scenario.value,
+      entry_type: "common",
       session_id: sessionId,
-      chatbot_config: {
-        goods_id: retailGoods.value,
-        chatbot_mode: chatModeOption.value,
-        use_history: useChatHistory,
-        enable_trace: enableTrace,
-        use_websearch: true,
-        google_api_key: '',
-        default_index_config: {
-          rag_index_ids: workspaceIds,
-        },
-        default_llm_config: {
-          model_id: modelOption,
-          endpoint_name:
-            modelOption === 'qwen2-72B-instruct' ? endPoint.trim() : '',
-          model_kwargs: {
-            temperature: parseFloat(temperature),
-            max_tokens: parseInt(maxToken),
-          },
-        },
-        agent_config: {
-          only_use_rag_tool: onlyRAGTool,
-        },
-      },
+      // chatbot_mode: chatModeOption.value,
+      user_profile:  chatModeOption.value,
+      use_history: useChatHistory,
+      enable_trace: enableTrace,
+      bot_id: "test",
     };
 
-    // add additional config
-    if (additionalConfig.trim()) {
-      const knownObject = JSON.parse(additionalConfig);
-      message = {
-        ...message,
-        chatbot_config: {
-          ...message.chatbot_config,
-          ...knownObject,
-        },
-      };
-    }
 
     console.info('send message:', message);
     sendMessage(JSON.stringify(message));
@@ -366,37 +262,7 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
     setUserMessage('');
   };
 
-  useEffect(() => {
-    let optionList: SelectProps.Option[] = [];
-    if (scenario.value === 'common') {
-      optionList = LLM_BOT_COMMON_MODEL_LIST.map((item) => {
-        return {
-          label: item,
-          value: item,
-        };
-      });
-      setModelList(optionList);
-      setModelOption(optionList?.[0]?.value ?? '');
-    } else if (scenario.value === 'retail') {
-      optionList = LLM_BOT_RETAIL_MODEL_LIST.map((item) => {
-        return {
-          label: item,
-          value: item,
-        };
-      });
-      setModelList(optionList);
-      setModelOption(optionList?.[0]?.value ?? '');
-    }
-  }, [scenario]);
 
-  useEffect(() => {
-    if (modelOption === 'qwen2-72B-instruct') {
-      setShowEndpoint(true);
-    } else {
-      setEndPoint('Qwen2-72B-Instruct-AWQ-2024-06-25-02-15-34-347');
-      setShowEndpoint(false);
-    }
-  }, [modelOption]);
 
   return (
     <CommonLayout
@@ -487,14 +353,14 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
                     {t('showTrace')}
                   </Toggle>
                 )}
-                {chatModeOption.value === 'agent' && (
-                  <Toggle
-                    onChange={({ detail }) => setOnlyRAGTool(detail.checked)}
-                    checked={onlyRAGTool}
-                  >
-                    {t('onlyUseRAGTool')}
-                  </Toggle>
-                )}
+                {/*{chatModeOption.value === 'agent' && (*/}
+                {/*  <Toggle*/}
+                {/*    onChange={({ detail }) => setOnlyRAGTool(detail.checked)}*/}
+                {/*    checked={onlyRAGTool}*/}
+                {/*  >*/}
+                {/*    {t('onlyUseRAGTool')}*/}
+                {/*  </Toggle>*/}
+                {/*)}*/}
 
                 {/*
                 <Toggle
@@ -528,125 +394,6 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
                 </StatusIndicator>
               </div>
             </div>
-          </div>
-          <div>
-            <ExpandableSection
-              onChange={({ detail }) => {
-                setModelSettingExpand(detail.expanded);
-              }}
-              expanded={modelSettingExpand}
-              // variant="footer"
-              headingTagOverride="h4"
-              headerText={t('modelSettings')}
-            >
-              <SpaceBetween direction="vertical" size="l">
-                <ColumnLayout columns={3} variant="text-grid">
-                  <FormField label={t('scenario')} stretch={true}>
-                    <Select
-                      options={SCENARIO_LIST}
-                      selectedOption={scenario}
-                      onChange={({ detail }) => {
-                        setScenario(detail.selectedOption);
-                      }}
-                    />
-                    {scenario.value == 'retail' && (
-                      <div style={{ minWidth: 300 }}>
-                        <Select
-                          options={RETAIL_GOODS_LIST}
-                          selectedOption={retailGoods}
-                          onChange={({ detail }) => {
-                            setRetailGoods(detail.selectedOption);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </FormField>
-                  <SpaceBetween size="xs">
-                    <FormField
-                      label={t('modelName')}
-                      stretch={true}
-                      errorText={t(modelError)}
-                    >
-                      <Autosuggest
-                        onChange={({ detail }) => {
-                          setModelError('');
-                          setModelOption(detail.value);
-                        }}
-                        value={modelOption}
-                        options={modelList}
-                        placeholder={t('validation.requireModel')}
-                        empty={t('noModelFound')}
-                      />
-                    </FormField>
-                    {showEndpoint && (
-                      <FormField
-                        label={t('endPoint')}
-                        stretch={true}
-                        errorText={t(endPointError)}
-                      >
-                        <Input
-                          onChange={({ detail }) => {
-                            setEndPointError('');
-                            setEndPoint(detail.value);
-                          }}
-                          value={endPoint}
-                          placeholder="QWen2-72B-XXXXX"
-                        />
-                      </FormField>
-                    )}
-                  </SpaceBetween>
-                  <FormField
-                    label={t('maxTokens')}
-                    stretch={true}
-                    errorText={t(maxTokenError)}
-                  >
-                    <Input
-                      type="number"
-                      value={maxToken}
-                      onChange={({ detail }) => {
-                        setMaxTokenError('');
-                        setMaxToken(detail.value);
-                      }}
-                    />
-                  </FormField>
-                  <FormField
-                    label={t('temperature')}
-                    stretch={true}
-                    errorText={t(temperatureError)}
-                  >
-                    <Input
-                      type="number"
-                      value={temperature}
-                      onChange={({ detail }) => {
-                        setTemperatureError('');
-                        setTemperature(detail.value);
-                      }}
-                    />
-                  </FormField>
-                </ColumnLayout>
-                <FormField
-                  label={t('additionalSettings')}
-                  errorText={t(additionalConfigError)}
-                >
-                  <Textarea
-                    rows={7}
-                    value={additionalConfig}
-                    onChange={({ detail }) => {
-                      setAdditionalConfigError('');
-                      setAdditionalConfig(detail.value);
-                    }}
-                    placeholder={JSON.stringify(
-                      {
-                        key: 'value',
-                        key2: ['value1', 'value2'],
-                      },
-                      null,
-                      4,
-                    )}
-                  />
-                </FormField>
-              </SpaceBetween>
-            </ExpandableSection>
           </div>
         </div>
       </div>

@@ -27,10 +27,6 @@ export const LLM_BOT_COMMON_MODEL_LIST = [
   'anthropic.claude-3-5-sonnet-20240620-v1:0',
 ];
 
-export const LLM_BOT_RETAIL_MODEL_LIST = [
-  'qwen2-72B-instruct',
-  'anthropic.claude-3-5-sonnet-20240620-v1:0',
-];
 
 
 export const LLM_BOT_CHAT_MODE_LIST: SelectProps.Option[] = [
@@ -39,8 +35,8 @@ export const LLM_BOT_CHAT_MODE_LIST: SelectProps.Option[] = [
     value: 'agent',
   },
   {
-    label: 'Chat',
-    value: 'chat',
+    label: 'Host',
+    value: 'host',
   },
 ];
 
@@ -49,19 +45,10 @@ export const SCENARIO_LIST: SelectProps.Option[] = [
     label: 'common',
     value: 'common',
   },
-  {
-    label: 'retail',
-    value: 'retail',
-  },
+  // {
+  //   label: 'retail',
+  //   value: 'retail',
+  // },
 ];
 
-export const RETAIL_GOODS_LIST: SelectProps.Option[] = [
-  {
-    label: '女子运动鞋-756327274174',
-    value: '756327274174',
-  },
-  {
-    label: '男款外套上衣-743891340644',
-    value: '743891340644',
-  },
-];
+
