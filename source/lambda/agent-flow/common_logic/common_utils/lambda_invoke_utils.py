@@ -3,7 +3,7 @@ import functools
 import importlib
 import json
 import time
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable,Union
 
 import requests
 from common_logic.common_utils.constant import StreamMessageType
@@ -14,7 +14,6 @@ from langchain.pydantic_v1 import BaseModel, Field, root_validator
 from .exceptions import LambdaInvokeError
 
 logger = get_logger("lambda_invoke_utils")
-
 
 class LAMBDA_INVOKE_MODE(enum.Enum):
     LAMBDA = "lambda"
@@ -48,7 +47,6 @@ class LambdaInvoker(BaseModel):
     def validate_environment(cls, values: Dict):
         if values.get("client") is not None:
             return values
-
         try:
             import boto3
 
@@ -92,20 +90,27 @@ class LambdaInvoker(BaseModel):
 
         if "errorType" in response_body:
             error = (
-                    f"{lambda_name} invoke failed\n\n"
-                    + "".join(response_body["stackTrace"])
-                    + "\n"
-                    + f"{response_body['errorType']}: {response_body['errorMessage']}"
+                f"{lambda_name} invoke failed\n\n"
+                + "".join(response_body["stackTrace"])
+                + "\n"
+                + f"{response_body['errorType']}: {response_body['errorMessage']}"
             )
             raise LambdaInvokeError(error)
 
         return response_body
 
     def invoke_with_local(
-            self, lambda_module_path: str, event_body: dict, handler_name="lambda_handler"
-    ):
-        lambda_module = importlib.import_module(lambda_module_path)
-        ret = getattr(lambda_module, handler_name)(event_body)
+        self, 
+        lambda_module_path: Union[str, Callable],
+        event_body: dict, 
+        handler_name="lambda_handler"
+        ):
+        if callable(lambda_module_path):
+            lambda_fn = lambda_module_path
+        else:
+            lambda_module = importlib.import_module(lambda_module_path)
+            lambda_fn = getattr(lambda_module, handler_name)
+        ret =lambda_fn(event_body)
         return ret
 
     def invoke_with_apigateway(self, url, event_body: dict):
@@ -118,13 +123,13 @@ class LambdaInvoker(BaseModel):
         return ret
 
     def invoke_lambda(
-            self,
-            event_body,
-            lambda_invoke_mode: LAMBDA_INVOKE_MODE = None,
-            lambda_name=None,
-            lambda_module_path=None,
-            handler_name="lambda_handler",
-            apigetway_url=None,
+        self,
+        event_body,
+        lambda_invoke_mode: LAMBDA_INVOKE_MODE = None,
+        lambda_name=None,
+        lambda_module_path=None,
+        handler_name="lambda_handler",
+        apigetway_url=None,
     ):
         lambda_invoke_mode = lambda_invoke_mode or _lambda_invoke_mode
 
@@ -158,17 +163,16 @@ def chatbot_lambda_call_wrapper(fn):
     """
     A decorator to monitor the execution of a lambda function.
     """
-
     @functools.wraps(fn)
     def inner(event: dict, context=None):
-        global _lambda_invoke_mode, _is_current_invoke_local, _enable_trace, _ws_connection_id
+        global _lambda_invoke_mode, _is_current_invoke_local,_enable_trace,_ws_connection_id
         _is_current_invoke_local = True if context is None else False
         current_lambda_invoke_mode = LAMBDA_INVOKE_MODE.LOCAL.value
         # avoid recursive lambda calling
         if context is not None and type(context).__name__ == "LambdaContext":
             context = context.__dict__
             _lambda_invoke_mode = LAMBDA_INVOKE_MODE.LOCAL.value
-            _enable_trace = event.get("enable_trace", True)
+            _enable_trace = event.get('chatbot_config',{}).get("enable_trace",True)
             # logger.info(f'event: {json.dumps(event,ensure_ascii=False,indent=2,cls=JSONEncoder)}')
 
         if "Records" in event:
@@ -192,7 +196,7 @@ def chatbot_lambda_call_wrapper(fn):
             _lambda_invoke_mode = LAMBDA_INVOKE_MODE.LOCAL.value
             current_lambda_invoke_mode = LAMBDA_INVOKE_MODE.API_GW.value
             event = json.loads(event["body"])
-
+       
         ret = fn(event, context=context)
         # save response to body
         # TODO
@@ -213,11 +217,11 @@ def is_running_local():
 
 
 def send_trace(
-        trace_info: str,
-        current_stream_use: bool = None,
-        ws_connection_id: Optional[str] = None,
+        trace_info: str, 
+        current_stream_use: bool = None, 
+        ws_connection_id: Optional[str] = None, 
         enable_trace: bool = None
-) -> None:
+    ) -> None:
     """
     Send trace information either to a WebSocket client or log it.
     """
@@ -226,7 +230,7 @@ def send_trace(
 
     if enable_trace is None:
         enable_trace = _enable_trace
-
+    
     if ws_connection_id is None:
         ws_connection_id = _ws_connection_id
 
@@ -240,16 +244,16 @@ def send_trace(
                 },
                 ws_connection_id=ws_connection_id,
             )
+            if not is_running_local():
+                logger.info(trace_info)
         else:
             logger.info(trace_info)
 
 
-def node_monitor_wrapper(fn: Optional[Callable[..., Any]] = None, *, monitor_key: str = "current_monitor_infos") -> \
-        Callable[..., Any]:
+def node_monitor_wrapper(fn: Optional[Callable[..., Any]] = None, *, monitor_key: str = "current_monitor_infos") -> Callable[..., Any]:
     """
     A decorator to monitor the execution of a node function.
     """
-
     def inner(func: Callable[..., Any]) -> Callable[..., Dict[str, Any]]:
         @functools.wraps(func)
         def wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -265,8 +269,7 @@ def node_monitor_wrapper(fn: Optional[Callable[..., Any]] = None, *, monitor_key
                 send_trace(f"\n\n {current_monitor_infos}", current_stream_use, ws_connection_id, enable_trace)
             exit_time = time.time()
             state['trace_infos'].append(f"Exit: {func.__name__}, time: {time.time()}")
-            send_trace(f"\n\n **Exit {func.__name__}**, elapsed time: {round((exit_time - enter_time) * 100) / 100} s",
-                       current_stream_use, ws_connection_id, enable_trace)
+            send_trace(f"\n\n **Exit {func.__name__}**, elapsed time: {round((exit_time-enter_time)*100)/100} s", current_stream_use, ws_connection_id, enable_trace)
             return output
 
         return wrapper

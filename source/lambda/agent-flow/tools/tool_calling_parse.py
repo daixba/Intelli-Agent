@@ -13,7 +13,7 @@ from common_logic.common_utils.exceptions import (
     MultipleToolNameError,
     ToolNotFound
 )
-from utils.tool_execute_result_format import format_tool_call_results
+from tools.tool_execute_result_format import format_tool_call_results
 from common_logic.common_utils.constant import (
     LLMModelType,
     MessageType
@@ -342,6 +342,10 @@ class Qwen2Instruct7BToolCallingParse(ToolCallingParse):
 
 class Qwen2Instruct72BToolCallingParse(Qwen2Instruct7BToolCallingParse):
     model_id = LLMModelType.QWEN2INSTRUCT72B
+
+
+class QWEN15INSTRUCT32BToolCallingParse(Qwen2Instruct7BToolCallingParse):
+    model_id = LLMModelType.QWEN15INSTRUCT32B
 
 
 parse_tool_calling = ToolCallingParse.parse_tool

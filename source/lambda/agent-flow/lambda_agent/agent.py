@@ -6,20 +6,21 @@ from common_logic.common_utils.logger_utils import get_logger
 from common_logic.common_utils.langchain_utils import chain_logger
 from common_logic.common_utils.lambda_invoke_utils import invoke_lambda, chatbot_lambda_call_wrapper
 from common_logic.common_utils.constant import LLMTaskType
-from utils.tools import get_tool_by_name
+from tools.tool_base import get_tool_by_name
 
 logger = get_logger("agent")
 
 
 def tool_calling(state: dict):
-    tools = state['current_intent_tools'] + [t["name"] for t in state["chatbot_config"]['tools']]
+    # print(state)
+    tools = state['intent_fewshot_tools'] + [t["name"] for t in state["chatbot_config"]['tools']]
     tool_defs = [get_tool_by_name(tool_name).tool_def for tool_name in tools]
 
     llm = state["chatbot_config"]['llm']
     llm_config = {
         **llm,
         "tools": tool_defs,
-        "fewshot_examples": state['intention_fewshot_examples'],
+        "fewshot_examples": state['intent_fewshot_examples'],
     }
 
     prompts = state["chatbot_config"]["prompts"]
