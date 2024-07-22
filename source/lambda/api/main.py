@@ -8,7 +8,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from utils.secret_util import get_secret_value
 from utils.aos_util import AOSUtil
 from model.model import Intention, BotVersion, Pagination
-from utils.common import paginate_list
+from utils.common import paginate_from
 
 opensearch_endpoint = os.environ.get("OPENSEARCH_ENDPOINT", "")
 secret_name = os.environ.get('AOS_SECRET_NAME')
@@ -51,10 +51,12 @@ def get_intention(bot_id: str):
 
     page = pagination_body.page
     size = pagination_body.size
+
+    start_from = paginate_from(page, size)
     
-    intention_list = aos_util.list_doc(bot_id, BotVersion.TEST)
+    intention_list = aos_util.list_doc(bot_id, BotVersion.TEST, start_from, size)
     
-    return paginate_list(intention_list, page, size)
+    return intention_list
 
 
 @app.post("/v1/bots/<bot_id>/intentions/<intention_id>")

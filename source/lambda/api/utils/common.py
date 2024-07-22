@@ -24,7 +24,6 @@ def get_index_and_model_id(bot_id: str, version: str):
 
     return index, model_id
 
-def paginate_list(input_list, page, size):
+def paginate_from(page, size):
     start_index = (page - 1) * size
-    end_index = start_index + size
-    return input_list[start_index:end_index]
+    return start_index

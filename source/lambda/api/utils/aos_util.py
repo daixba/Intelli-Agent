@@ -86,7 +86,7 @@ class AOSUtil:
         create_aos_ingestion(model_id, docsearch, [doc])
     
 
-    def list_doc(self, bot_id: str, version: str):
+    def list_doc(self, bot_id: str, version: str, start_from: int, size: int):
 
         index = get_index(bot_id, version)
 
@@ -101,7 +101,10 @@ class AOSUtil:
         result = self.aos_client.search(
             body=search_body, 
             index=index, 
-            params={'size': 999}, 
+            params={
+                'from': start_from,
+                'size': size
+            }, 
             headers=headers
         )
 
