@@ -18,7 +18,6 @@ def tool_calling(state: dict):
     tools = []
 
     user_profile = state.get("user_profile", "")
-    print(user_profile)
     for t in state["chatbot_config"]['tools']:
         profiles = t.get("profiles", [])
         if profiles and user_profile:
@@ -29,7 +28,6 @@ def tool_calling(state: dict):
 
     tools += ["comfort", "greeting", "give_final_response", "give_rhetorical_question"]
     tool_defs = [get_tool_by_name(tool_name).tool_def for tool_name in tools]
-    print(tool_defs)
 
     llm = state["chatbot_config"]['llm']
     llm_config = {

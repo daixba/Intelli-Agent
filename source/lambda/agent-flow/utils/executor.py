@@ -192,23 +192,23 @@ def agent(state: ChatbotState):
             first_tool_final_response = True
 
     # TODO: double check only_use_rag_tool
-    if no_intention_condition or first_tool_final_response:
-        # if state['chatbot_config']['agent_config']['only_use_rag_tool']:
-        #     send_trace("agent only use rag tool", enable_trace=state["enable_trace"])
-        if no_intention_condition:
-            send_trace("no_intention_condition, switch to rag tool", enable_trace=state["enable_trace"])
-        elif first_tool_final_response:
-            send_trace("first tool is final response, switch to rag tool", enable_trace=state["enable_trace"])
-
-        return {
-            "function_calling_parse_ok": True,
-            "agent_repeated_call_validation": True,
-            "function_calling_parsed_tool_calls": [{
-                "name": "rag_tool",
-                "kwargs": {},
-                "model_id": state['chatbot_config']['agent_config']['model_id']
-            }]
-        }
+    # if no_intention_condition or first_tool_final_response:
+    #     # if state['chatbot_config']['agent_config']['only_use_rag_tool']:
+    #     #     send_trace("agent only use rag tool", enable_trace=state["enable_trace"])
+    #     if no_intention_condition:
+    #         send_trace("no_intention_condition, switch to rag tool", enable_trace=state["enable_trace"])
+    #     elif first_tool_final_response:
+    #         send_trace("first tool is final response, switch to rag tool", enable_trace=state["enable_trace"])
+    #
+    #     return {
+    #         "function_calling_parse_ok": True,
+    #         "agent_repeated_call_validation": True,
+    #         "function_calling_parsed_tool_calls": [{
+    #             "name": "rag_tool",
+    #             "kwargs": {},
+    #             "model_id": state['chatbot_config']['agent_config']['model_id']
+    #         }]
+    #     }
     response = app_agent.invoke(state)
 
     return response
