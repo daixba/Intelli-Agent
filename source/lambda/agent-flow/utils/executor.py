@@ -46,6 +46,9 @@ class ChatbotState(TypedDict):
     stream: bool
     # message id related to original input question
     message_id: str = None
+    # user profile
+    user_profile: str = None
+
     # record running states of different nodes
     trace_infos: Annotated[list[str], add_messages]
     # whether to enbale trace info update via streaming ouput
@@ -394,6 +397,7 @@ def run(event_body):
     chat_history = event_body.get("chat_history", []) if use_history else []
     stream = event_body.get("stream", True)
     message_id = event_body["custom_message_id"]
+    user_profile = event_body.get("user_profile", "default")
     ws_connection_id = event_body["ws_connection_id"]
     enable_trace = event_body.get("enable_trace", True)
     # get all registered tools with parameters
@@ -410,6 +414,7 @@ def run(event_body):
             "enable_trace": enable_trace,
             "trace_infos": [],
             "message_id": message_id,
+            "user_profile": user_profile,
             "chat_history": chat_history,
             "agent_tool_history": [],
             "ws_connection_id": ws_connection_id,

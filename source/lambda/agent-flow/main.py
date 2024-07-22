@@ -37,8 +37,6 @@ def get_bot_info(bot_id: str):
     if len(bots) == 0:
         raise RuntimeError("No bots created")
     bot = bots[0]
-    default_tools = ["give_rhetorical_question", "give_final_response"]
-    bot["tools"].extend([{"name": t} for t in default_tools])
     model_kwargs = bot["llm"]["model_kwargs"]
     model_kwargs["temperature"] = float(bot["llm"].get("temperature", "0.01"))
     model_kwargs["max_tokens"] = int(bot["llm"].get("max_tokens", "4096"))

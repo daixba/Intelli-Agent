@@ -4,6 +4,7 @@ from common_logic.common_utils.constant import (
     LLMTaskType
 )
 from common_logic.common_utils.lambda_invoke_utils import send_trace
+from utils.prompt_utils import get_system_prompt, PromptType
 
 
 def lambda_handler(event_body, context=None):
@@ -57,12 +58,12 @@ def lambda_handler(event_body, context=None):
     send_trace(f"\n\n**rag-contexts:** {context_list}", enable_trace=state["enable_trace"])
 
     llm_config = state["chatbot_config"]["llm"]
-    task_type = LLMTaskType.RAG
     rag_event_body = {
         "llm_config": {
             **llm_config,
             "stream": state["stream"],
             "intent_type": LLMTaskType.RAG,
+            "system_prompt": get_system_prompt(state, PromptType.RAG),
         },
         "llm_input": {
             "contexts": context_list,
@@ -70,10 +71,6 @@ def lambda_handler(event_body, context=None):
             "chat_history": state["chat_history"],
         },
     }
-    prompts = state["chatbot_config"]["prompts"]
-    for prompt in prompts:
-        if prompt["type"] == "RAG":
-            rag_event_body["llm_config"]["system_prompt"] = prompt["text"]
 
     output: str = invoke_lambda(
         lambda_name="Online_LLM_Generate",

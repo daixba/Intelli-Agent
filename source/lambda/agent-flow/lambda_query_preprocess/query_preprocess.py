@@ -7,7 +7,7 @@ from common_logic.common_utils.logger_utils import get_logger
 from common_logic.common_utils.langchain_utils import chain_logger
 from common_logic.common_utils.lambda_invoke_utils import invoke_lambda, chatbot_lambda_call_wrapper
 from common_logic.common_utils.constant import LLMTaskType
-from common_logic.common_utils.prompt_utils import get_prompt_templates_from_ddb
+from utils.prompt_utils import get_system_prompt, PromptType
 
 logger = get_logger("query_preprocess")
 
@@ -34,14 +34,11 @@ def conversation_query_rewrite(state: dict):
     event_body = {
         "llm_config": {
             **conversation_query_rewrite_config,
-            "intent_type": query_rewrite_llm_type},
+            "intent_type": query_rewrite_llm_type,
+            "system_prompt": get_system_prompt(state, PromptType.CONV_SUMMARY)
+        },
         "llm_input": {"chat_history": state['chat_history'], "query": state['query']}
     }
-    # replace system prompt
-    prompts = state["chatbot_config"]["prompts"]
-    for prompt in prompts:
-        if prompt["type"] == "CONV_SUMMARY":
-            event_body["llm_config"]["system_prompt"] = prompt["text"]
 
     cqr_llm_chain = RunnableLambda(lambda x: invoke_lambda(
         lambda_name='Online_LLM_Generate',
