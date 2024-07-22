@@ -48,7 +48,8 @@ class StructureSystem(object):
         if lang == 'zh':
             lang = 'ch'
         start = time.time()
-        ori_im = img.copy()
+        ori_im_shape = img.shape
+        ori_im_dtype = img.dtype
         layout_res, elapse = self.layout_predictor(img)
         final_s = None
         if auto_dpi:
@@ -74,10 +75,10 @@ class StructureSystem(object):
                 x1, y1, x2, y2 = region['bbox']
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 x1, y1, x2, y2 = max(x1, 0), max(y1, 0), max(x2, 0), max(y2, 0)
-                roi_img = ori_im[y1:y2, x1:x2, :]
+                roi_img = img[y1:y2, x1:x2, :]
             else:
                 x1, y1, x2, y2 = 0, 0, w, h
-                roi_img = ori_im
+                roi_img = img
             if region['label'] == 'table':
                 res, table_time_dict = self.table_system(
                     roi_img, return_ocr_result_in_table, lang)
@@ -86,7 +87,7 @@ class StructureSystem(object):
                 time_dict['det'] += table_time_dict['det']
                 time_dict['rec'] += table_time_dict['rec']
             else:
-                wht_im = np.ones(ori_im.shape, dtype=ori_im.dtype)
+                wht_im = np.ones(ori_im_shape, dtype=ori_im_dtype)
                 wht_im[y1:y2, x1:x2, :] = roi_img
                 top = min(y2-y1, y1)
                 left = min(x2-x1, x1)
@@ -129,6 +130,8 @@ class StructureSystem(object):
 structure_engine = StructureSystem()
 figure_understand = figureUnderstand()
 s3 = boto3.client("s3")
+
+
 def upload_images_to_s3(
     images, bucket: str, prefix: str, splitting_type: str
 ):
@@ -191,10 +194,9 @@ def structure_predict(file_path: Path, lang: str, auto_dpi, figure_rec) -> str:
     """
 
     # img_list, flag_gif, flag_pdf are returned from check_and_read
-    img_list, _, _ = check_and_read(file_path)
 
     all_res = []
-    for index, img in enumerate(img_list):
+    for index, img in enumerate(check_and_read(file_path)):
         result, _ = structure_engine(img, lang=lang, auto_dpi=auto_dpi)
         if result != []:
             boxes = [row["bbox"] for row in result]
@@ -209,17 +211,20 @@ def structure_predict(file_path: Path, lang: str, auto_dpi, figure_rec) -> str:
         if len(region["res"]) == 0:
             continue
         if region["type"].lower() == "figure":
+            region_text = ""
             if figure_rec:
                 doc += '<{{figure_' + str(len(figure)) + '}}>\n'
+                figure['<{{figure_' + str(len(figure)) + '}}>'] = [Image.fromarray(region["img"]), None]
             else:
                 doc += '<{{figure_' + str(len(figure)) + '}}>\n'
-                region_text = ""
                 for _, line in enumerate(region["res"]):
                     region_text += line["text"] + " "
                 if remove_symbols(region_text) != remove_symbols(prev_region_text):
-                    doc += region_text
+                    figure['<{{figure_' + str(len(figure)) + '}}>'] = [Image.fromarray(region["img"]), region_text]
                     prev_region_text = region_text
-            figure['<{{figure_' + str(len(figure)) + '}}>'] = Image.fromarray(region["img"])
+                else:
+                    figure['<{{figure_' + str(len(figure)) + '}}>'] = [Image.fromarray(region["img"]), None]
+            
         elif region["type"].lower() == "title":
             region_text = ''
             for i, line in enumerate(region['res']):
@@ -255,13 +260,14 @@ def structure_predict(file_path: Path, lang: str, auto_dpi, figure_rec) -> str:
     doc = re.sub("\n{2,}", "\n\n", doc.strip())
     images = {}
     for figure_idx, (k,v) in enumerate(figure.items()):
-        images[f'{figure_idx:05d}.jpg'] = v
+        images[f'{figure_idx:05d}.jpg'] = v[0]
+        region_text = v[1] if not v[1] is None else ''
         if figure_rec:
             start_pos = doc.index(k)
             context = doc[max(start_pos-200, 0): min(start_pos+200, len(doc))]
-            doc = doc.replace(k, figure_understand(v, context, k, s3_link=f'{figure_idx:05d}.jpg'))
+            doc = doc.replace(k, figure_understand(v[0], context, k, s3_link=f'{figure_idx:05d}.jpg'))
         else:
-            doc = doc.replace(k, f"<figure><link>{figure_idx:05d}.jpg</link></figure>")
+            doc = doc.replace(k, f"\n<figure>\n<link>{figure_idx:05d}.jpg</link>\n<type>ocr</type>\n<desp>\n{region_text}\n</desp>\n</figure>\n")
     doc = re.sub("\n{2,}", "\n\n", doc.strip())
     return doc, images
 
@@ -274,6 +280,7 @@ def process_pdf_pipeline(request_body):
             - s3_bucket (str): The source S3 bucket name.
             - object_key (str): The key of the PDF object in the source bucket.
             - destination_bucket (str): The destination S3 bucket name.
+            - portal_bucket (str): The portal S3 bucket name
             - mode (str, optional): The processing mode. Defaults to "ppstructure".
             - lang (str, optional): The language of the PDF. Defaults to "zh".
 
@@ -284,6 +291,7 @@ def process_pdf_pipeline(request_body):
     bucket = request_body["s3_bucket"]
     object_key = request_body["object_key"]
     destination_bucket = request_body["destination_bucket"]
+    portal_bucket = request_body["portal_bucket"]
     mode = request_body.get("mode", "ppstructure")
     lang = request_body.get("lang", "zh")
     auto_dpi = bool(request_body.get("auto_dpi", True))
@@ -298,10 +306,10 @@ def process_pdf_pipeline(request_body):
     content, images = structure_predict(local_path, lang, auto_dpi, figure_rec)
     filename = file_path.stem
     name_s3path = upload_images_to_s3(
-        images, destination_bucket, filename, "before-splitting"
+        images, portal_bucket, filename, "image"
     )
     for key, s3_path in name_s3path.items():
-        content = content.replace(f'<link>{key}</link>', s3_path)
+        content = content.replace(f'<link>{key}</link>', f'<link>{s3_path}</link>')
     destination_s3_path = upload_chunk_to_s3(
         content, destination_bucket, filename, "before-splitting"
     )

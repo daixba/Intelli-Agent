@@ -96,7 +96,7 @@ class figureUnderstand():
             pattern = fr"<{tag}>(.*?)</{tag}>"
             output = re.findall(pattern, llm_output, re.DOTALL)[0].strip()
         except:
-            output = result.replace(f"<{tag}>", '').replace(f"</{tag}>", '')
+            output = llm_output.replace(f"<{tag}>", '').replace(f"</{tag}>", '')
         return output
     def __call__(self, img, context, tag, s3_link):
         classification = self.get_classification(img)
@@ -108,11 +108,11 @@ class figureUnderstand():
             if classification in ('XY Chart', 'Pie chart diagrams'):
                 table = self.get_chart(img, context, tag)
                 table = self.parse_result(table, 'output')
-                output = f'<figure><type>chart</type><link>{s3_link}</link><desp>{description}</desp><value>{table}</value></figure>'
+                output = f'\n<figure>\n<type>chart</type>\n<link>{s3_link}</link>\n<desp>\n{description}\n</desp>\n<value>\n{table}\n</value>\n</figure>\n'
             else:
-                output = f'<figure><type>chart-mermaid</type><link>{s3_link}</link><desp>{description}</desp><value>{mermaid_code}</value></figure>'
+                output = f'\n<figure>\n<type>chart-mermaid</type>\n<link>{s3_link}</link>\n<desp>\n{description}\n</desp>\n<value>\n{mermaid_code}\n</value>\n</figure>\n'
         else:
             description = self.get_description(img, context, tag)
             description = self.parse_result(description, 'output')
-            output = f'<figure><type>image</type><link>{s3_link}</link><desp>{description}</desp></figure>'
+            output = f'\n<figure>\n<type>image</type>\n<link>{s3_link}</link>\n<desp>\n{description}\n</desp>\n</figure>\n'
         return output
