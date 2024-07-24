@@ -56,7 +56,7 @@ export class DynamoDBConstruct extends Construct {
     }
     const timestampAttr = {
       name: "created_at",
-      type: dynamodb.AttributeType.STRING,
+      type: dynamodb.AttributeType.NUMBER,
     }
 
 
@@ -74,11 +74,11 @@ export class DynamoDBConstruct extends Construct {
       partitionKey: sessionIdAttr,
     });
 
-    this.botTable = new DynamoDBTable(this, "Bot", botIdAttr, versionAttr).table;
+    this.botTable = new DynamoDBTable(this, "ChatBot", botIdAttr, versionAttr).table;
     this.botTable.addGlobalSecondaryIndex({
       indexName: this.byVersion,
       partitionKey: versionAttr,
-      sortKey: botIdAttr,
+      sortKey: timestampAttr,
       projectionType: dynamodb.ProjectionType.ALL,
     });
 

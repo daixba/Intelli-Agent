@@ -6,20 +6,12 @@ from aws_lambda_powertools import Logger
 
 logger = Logger()
 
-region = os.environ.get("AWS_REGION")
+region_name = os.environ.get("AWS_REGION")
 
-def get_secret_value(bot_secret_name: str):
-    logger.info("Getting secret...")
-    secret_name = bot_secret_name
-    region_name = region
 
+def get_secret_value(secret_name: str):
     # Create a Secrets Manager client
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
-        region_name=region_name
-    )
-
+    client = boto3.client('secretsmanager')
 
     try:
         get_secret_value_response = client.get_secret_value(
@@ -54,3 +46,4 @@ def get_secret_value(bot_secret_name: str):
             return secret
         else:
             decoded_binary_secret = base64.b64decode(get_secret_value_response['SecretBinary'])
+            return decoded_binary_secret

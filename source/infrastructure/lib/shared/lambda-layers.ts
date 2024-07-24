@@ -27,7 +27,7 @@ export class LambdaLayers {
         "APIDefaultLambdaLayer",
         {
             code: Code.fromAsset(
-                path.join(__dirname, "../../../lambda/api"),
+                path.join(__dirname, "../../../lambda/layer/api"),
                 {
                     bundling: {
                         image: Runtime.PYTHON_3_12.bundlingImage,
