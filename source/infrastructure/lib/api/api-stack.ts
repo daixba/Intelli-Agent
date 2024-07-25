@@ -204,6 +204,7 @@ export class ApiConstruct extends Construct {
 
     const methodOption = {
       authorizer: auth,
+      apiKeyRequired: true,
       methodResponses: [
         {
           statusCode: '200',
@@ -300,6 +301,22 @@ export class ApiConstruct extends Construct {
     // Define the API Gateway Method
     const apiResourceLLM = api.root.addResource("llm");
     apiResourceLLM.addMethod("POST", lambdaExecutorIntegration, methodOption);
+
+    apiResourceLLM.addProxy({
+      defaultIntegration: lambdaExecutorIntegration,
+      defaultMethodOptions: methodOption
+    })
+
+    const plan = api.addUsagePlan('ExternalUsagePlan', {
+      name: 'external-api-usage-plan'
+    });
+    
+    const key = api.addApiKey('ApiKey');
+    
+    plan.addApiKey(key);
+    plan.addApiStage({
+      stage: api.deploymentStage
+    })
 
     const lambdaDispatcher = new Function(this, "lambdaDispatcher", {
       runtime: Runtime.PYTHON_3_12,
