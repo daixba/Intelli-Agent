@@ -204,7 +204,7 @@ export class ApiConstruct extends Construct {
 
     const methodOption = {
       authorizer: auth,
-      apiKeyRequired: true,
+      // apiKeyRequired: true,
       methodResponses: [
         {
           statusCode: '200',

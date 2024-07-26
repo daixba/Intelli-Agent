@@ -14,7 +14,7 @@ from common_logic.common_utils.lambda_invoke_utils import (
     is_running_local,
 )
 from utils import executor
-from utils.bot_util import get_bot_info_from_table, scan_bot_info_from_table
+from utils.bot_util import get_bot_info
 
 logger = get_logger("main")
 
@@ -98,9 +98,19 @@ def create_rest_api_agent_flow_body(event_body: dict, context: dict):
 
     # fix user_id for now
     user_id = "default_user_id"
-    chat_history = []
     if not session_id:
         session_id = f"{user_id}{request_timestamp}"
+
+    client_type = event_body.get("client_type", "default_client_type")
+    ddb_history_obj = DynamoDBChatMessageHistory(
+        sessions_table_name=session_table_name,
+        messages_table_name=message_table_name,
+        session_id=session_id,
+        user_id=user_id,
+        client_type=client_type,
+    )
+    #
+    chat_history = ddb_history_obj.messages_as_langchain
 
     agent_flow_body = {}
     agent_flow_body["query"] = query
@@ -110,14 +120,16 @@ def create_rest_api_agent_flow_body(event_body: dict, context: dict):
     agent_flow_body["use_history"] = True
     agent_flow_body["enable_trace"] = False
     agent_flow_body["session_id"] = session_id
-    agent_flow_body["chatbot_config"] = get_bot_info_from_table(bot_id)
+    agent_flow_body["chatbot_config"] = get_bot_info(
+        bot_id, "PROD"
+    )  # from prod version
     agent_flow_body["chat_history"] = chat_history
     agent_flow_body["request_timestamp"] = request_timestamp
     agent_flow_body["user_id"] = user_id
     agent_flow_body["message_id"] = str(uuid.uuid4())
     agent_flow_body["agent"] = agent
     agent_flow_body["context_round"] = context_round
-    agent_flow_body["ddb_history_obj"] = []  # not used
+    agent_flow_body["ddb_history_obj"] = ddb_history_obj
     agent_flow_body["stream"] = False
     agent_flow_body["custom_message_id"] = ""
     agent_flow_body["ws_connection_id"] = ""
@@ -152,7 +164,7 @@ def create_ws_agent_flow_body(event_body: dict, context: dict):
 
     # bot id must exist in request body
     bot_id = event_body.get("bot_id", "")
-    event_body["chatbot_config"] = scan_bot_info_from_table()
+    event_body["chatbot_config"] = get_bot_info(bot_id)
     event_body["stream"] = stream
     event_body["chat_history"] = chat_history
     event_body["ws_connection_id"] = ws_connection_id

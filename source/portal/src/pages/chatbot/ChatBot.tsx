@@ -70,7 +70,7 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
 
 
   const [sessionId, setSessionId] = useState(historySessionId);
-
+  const [botId, setBotId] = useState('');
   const [showMessageError, setShowMessageError] = useState(false);
   // const [googleAPIKeyError, setGoogleAPIKeyError] = useState(false);
   const [isMessageEnd, setIsMessageEnd] = useState(false);
@@ -86,18 +86,19 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
   // Define an async function to get the data
   const fetchData = useAxiosRequest();
 
-  // const getWorkspaceList = async () => {
-  //   try {
-  //     const data = await fetchData({
-  //       url: 'etl/list-workspace',
-  //       method: 'get',
-  //     });
-  //     setWorkspaceIds(data.workspace_ids);
-  //   } catch (error) {
-  //     console.error(error);
-  //     return [];
-  //   }
-  // };
+    const getBotList = async () => {
+    try {
+      console.log("get bots")
+      const data = await fetchData({
+        url: 'v1/bots',
+        method: 'get',
+      });
+      console.log(data)
+      setBotId(data[0].bot_id)
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const getSessionHistoryById = async () => {
     try {
@@ -144,7 +145,7 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
     } else {
       setSessionId(uuidv4());
     }
-    // getWorkspaceList();
+    getBotList();
   }, []);
 
   useEffect(() => {
@@ -237,11 +238,10 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
       query: userMessage,
       entry_type: "common",
       session_id: sessionId,
-      // chatbot_mode: chatModeOption.value,
       user_profile:  chatModeOption.value,
       use_history: useChatHistory,
       enable_trace: enableTrace,
-      bot_id: "test",
+      bot_id: botId,
     };
 
 
