@@ -22,23 +22,21 @@ aos_endpoint = os.environ.get("AOS_ENDPOINT", "")
 aos_domain_name = os.environ.get("AOS_DOMAIN_NAME", "smartsearch")
 aos_secret = os.environ.get("AOS_SECRET_NAME", "opensearch-master-user")
 
-sm_client = boto3.client('secretsmanager')
-master_user = sm_client.get_secret_value(SecretId=aos_secret)['SecretString']
+sm_client = boto3.client("secretsmanager")
+master_user = sm_client.get_secret_value(SecretId=aos_secret)["SecretString"]
 
 DEFAULT_TEXT_FIELD_NAME = "text"
 DEFAULT_VECTOR_FIELD_NAME = "vector_field"
 DEFAULT_SOURCE_FIELD_NAME = "source"
 
 if not aos_endpoint:
-    aos_client = boto3.client('opensearch')
-    response = aos_client.describe_domain(
-        DomainName=aos_domain_name
-    )
+    aos_client = boto3.client("opensearch")
+    response = aos_client.describe_domain(DomainName=aos_domain_name)
 
-    aos_endpoint = response['DomainStatus']['Endpoint']
+    aos_endpoint = response["DomainStatus"]["Endpoint"]
 cred = json.loads(master_user)
-username = cred.get('username')
-password = cred.get('password')
+username = cred.get("username")
+password = cred.get("password")
 auth = (username, password)
 aos_client = LLMBotOpenSearchClient(aos_endpoint, auth)
 
@@ -58,7 +56,7 @@ def get_similarity_embedding(
         query: str,
         embedding_model_id: str,
         target_model: str = "",
-        model_type: str = "vector"
+        model_type: str = "vector",
 ):
     # query_similarity_embedding_prompt = query
     # response = SagemakerEndpointVectorOrCross(
@@ -100,7 +98,10 @@ def get_faq_answer(source, index_name, source_field):
         field=f"metadata.{source_field}",
     )
     for r in opensearch_query_response["hits"]["hits"]:
-        if "field" in r["_source"]["metadata"] and "answer" == r["_source"]["metadata"]["field"]:
+        if (
+                "field" in r["_source"]["metadata"]
+                and "answer" == r["_source"]["metadata"]["field"]
+        ):
             return r["_source"]["content"]
         elif "jsonlAnswer" in r["_source"]["metadata"]:
             return r["_source"]["metadata"]["jsonlAnswer"]["answer"]
@@ -132,7 +133,9 @@ def get_doc(file_path, index_name):
     chunk_id_set = set()
     for r in opensearch_query_response["hits"]["hits"]:
         try:
-            if "chunk_id" not in r["_source"]["metadata"] or not r["_source"]["metadata"]["chunk_id"].startswith("$"):
+            if "chunk_id" not in r["_source"]["metadata"] or not r["_source"][
+                "metadata"
+            ]["chunk_id"].startswith("$"):
                 continue
             chunk_id = r["_source"]["metadata"]["chunk_id"]
             content_type = r["_source"]["metadata"]["content_type"]
@@ -144,13 +147,23 @@ def get_doc(file_path, index_name):
             logger.error(traceback.format_exc())
             continue
         chunk_id_set.add((chunk_id, content_type))
-        chunk_list.append((chunk_id, chunk_group_id, content_type, chunk_section_id, r["_source"]["text"]))
+        chunk_list.append(
+            (
+                chunk_id,
+                chunk_group_id,
+                content_type,
+                chunk_section_id,
+                r["_source"]["text"],
+            )
+        )
     sorted_chunk_list = sorted(chunk_list, key=lambda x: (x[1], x[2], x[3]))
     chunk_text_list = [x[4] for x in sorted_chunk_list]
     return "\n".join(chunk_text_list)
 
 
-def organize_faq_results(response, index_name, source_field="file_path", text_field="text"):
+def organize_faq_results(
+        response, index_name, source_field="file_path", text_field="text"
+):
     """
     Organize results from aos response
 
@@ -165,21 +178,22 @@ def organize_faq_results(response, index_name, source_field="file_path", text_fi
         result = {}
         try:
             result["score"] = aos_hit["_score"]
-            result["detail"] = aos_hit["_source"]
-            if "field" in aos_hit["_source"]["metadata"]:
-                result["answer"] = get_faq_answer(result["source"], index_name, source_field)
+            data = aos_hit["_source"]
+            metadata = data["metadata"]
+            if "field" in metadata:
+                result["answer"] = get_faq_answer(
+                    result["source"], index_name, source_field
+                )
                 result["content"] = aos_hit["_source"]["content"]
                 result["question"] = aos_hit["_source"]["content"]
                 result[source_field] = aos_hit["_source"]["metadata"][source_field]
-            elif "jsonlAnswer" in aos_hit["_source"]["metadata"] and "answer" in aos_hit["_source"]["metadata"][
-                "jsonlAnswer"]:
-                result["answer"] = aos_hit["_source"]["metadata"]["jsonlAnswer"]["answer"]
-                result["question"] = aos_hit["_source"]["metadata"]["jsonlAnswer"]["question"]
-                result["content"] = aos_hit["_source"]["text"]
-                if source_field in aos_hit["_source"]["metadata"]["jsonlAnswer"].keys():
-                    result[source_field] = aos_hit["_source"]["metadata"]["jsonlAnswer"][source_field]
-                else:
-                    result[source_field] = aos_hit["_source"]["metadata"]["file_path"]
+            elif "answer" in metadata:
+                # Intentions
+                result["answer"] = metadata["answer"]
+                result["question"] = data["text"]
+                result["content"] = data["text"]
+                result["source"] = metadata[source_field]
+                result["kwargs"] = metadata.get("kwargs", {})
             else:
                 result["answer"] = aos_hit["_source"]["metadata"]
                 result["content"] = aos_hit["_source"][text_field]
@@ -208,13 +222,25 @@ class QueryQuestionRetriever(BaseRetriever):
     query_key: str = "query"
     enable_debug: Any
 
-    def __init__(self, retriever_config: Dict, top_k: int = 3, query_key="query", enable_debug=False):
+    def __init__(
+            self,
+            retriever_config: Dict,
+            top_k: int = 3,
+            query_key="query",
+            enable_debug=False,
+    ):
         super().__init__()
 
         self.index = retriever_config["index"]
-        self.vector_field = retriever_config["config"].get("vector_field_name", DEFAULT_VECTOR_FIELD_NAME)
-        self.text_field = retriever_config["config"].get("text_field_name", DEFAULT_TEXT_FIELD_NAME)
-        self.source_field = retriever_config["config"].get("source_field_name", DEFAULT_SOURCE_FIELD_NAME)
+        self.vector_field = retriever_config["config"].get(
+            "vector_field_name", DEFAULT_VECTOR_FIELD_NAME
+        )
+        self.text_field = retriever_config["config"].get(
+            "text_field_name", DEFAULT_TEXT_FIELD_NAME
+        )
+        self.source_field = retriever_config["config"].get(
+            "source_field_name", DEFAULT_SOURCE_FIELD_NAME
+        )
         self.top_k = int(retriever_config["config"].get("top_k", "3"))
         # self.lang = workspace["languages"][0]
         self.lang = "English"
@@ -230,7 +256,9 @@ class QueryQuestionRetriever(BaseRetriever):
         self.enable_debug = enable_debug
 
     @timeit
-    def _get_relevant_documents(self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    def _get_relevant_documents(
+            self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
         query = question[self.query_key]
         debug_info = question["debug_info"]
         opensearch_knn_results = []
@@ -243,16 +271,31 @@ class QueryQuestionRetriever(BaseRetriever):
             size=self.top_k,
         )
         opensearch_knn_results.extend(
-            organize_faq_results(opensearch_knn_response, self.index, self.source_field, self.text_field)
+            organize_faq_results(
+                opensearch_knn_response, self.index, self.source_field, self.text_field
+            )
         )
         docs = []
         for result in opensearch_knn_results:
-            docs.append(Document(page_content=result["content"], metadata={
-                "source": result[self.source_field], "score": result["score"], "retrieval_score": result["score"],
-                "retrieval_content": result["content"], "answer": result["answer"],
-                "question": result["question"]}))
+            docs.append(
+                Document(
+                    page_content=result["content"],
+                    metadata={
+                        "source": result[self.source_field],
+                        "score": result["score"],
+                        "retrieval_score": result["score"],
+                        "retrieval_content": result["content"],
+                        "answer": result["answer"],
+                        "question": result["question"],
+                        "kwargs": result.get("kwargs", {}),
+                    },
+                )
+            )
+
         if self.enable_debug:
-            debug_info[f"qq-knn-recall-{self.index}-{self.lang}"] = remove_redundancy_debug_info(opensearch_knn_results)
+            debug_info[f"qq-knn-recall-{self.index}-{self.lang}"] = (
+                remove_redundancy_debug_info(opensearch_knn_results)
+            )
         return docs
 
 
@@ -270,8 +313,15 @@ class QueryDocumentKNNRetriever(BaseRetriever):
     query_key: str = "query"
     enable_debug: Any
 
-    def __init__(self, retriever_config: Dict, using_whole_doc=False, context_num=5, top_k=3, query_key='query',
-                 enable_debug=False):
+    def __init__(
+            self,
+            retriever_config: Dict,
+            using_whole_doc=False,
+            context_num=5,
+            top_k=3,
+            query_key="query",
+            enable_debug=False,
+    ):
         super().__init__()
         # self.index = workspace["open_search_index_name"]
         # self.vector_field = "vector_field"
@@ -285,9 +335,15 @@ class QueryDocumentKNNRetriever(BaseRetriever):
         #     self.target_model = None
         # self.model_type = workspace["model_type"]
         self.index = retriever_config["index"]
-        self.vector_field = retriever_config["config"].get("vector_field_name", DEFAULT_VECTOR_FIELD_NAME)
-        self.text_field = retriever_config["config"].get("text_field_name", DEFAULT_TEXT_FIELD_NAME)
-        self.source_field = retriever_config["config"].get("source_field_name", DEFAULT_SOURCE_FIELD_NAME)
+        self.vector_field = retriever_config["config"].get(
+            "vector_field_name", DEFAULT_VECTOR_FIELD_NAME
+        )
+        self.text_field = retriever_config["config"].get(
+            "text_field_name", DEFAULT_TEXT_FIELD_NAME
+        )
+        self.source_field = retriever_config["config"].get(
+            "source_field_name", DEFAULT_SOURCE_FIELD_NAME
+        )
         self.top_k = int(retriever_config["config"].get("top_k", "3"))
         # self.lang = workspace["languages"][0]
         self.lang = "English"
@@ -318,8 +374,15 @@ class QueryDocumentKNNRetriever(BaseRetriever):
     #     return await asyncio.gather(*task_list)
 
     @timeit
-    def organize_results(self, response, aos_index=None, source_field="file_path", text_field="text",
-                         using_whole_doc=True, context_size=0):
+    def organize_results(
+            self,
+            response,
+            aos_index=None,
+            source_field="file_path",
+            text_field="text",
+            using_whole_doc=True,
+            context_size=0,
+    ):
         """
         Organize results from aos response
 
@@ -334,12 +397,12 @@ class QueryDocumentKNNRetriever(BaseRetriever):
             return results
         for aos_hit in aos_hits:
             result = {"data": {}}
-            source = aos_hit['_source']['metadata'][source_field]
+            source = aos_hit["_source"]["metadata"][source_field]
             result["source"] = source
             result["score"] = aos_hit["_score"]
-            result["detail"] = aos_hit['_source']
+            result["detail"] = aos_hit["_source"]
             # result["content"] = aos_hit['_source'][text_field]
-            result["content"] = aos_hit['_source'][text_field]
+            result["content"] = aos_hit["_source"][text_field]
             result["doc"] = result["content"]
             # if 'additional_vecs' in aos_hit['_source']['metadata'] and \
             #     'colbert_vecs' in aos_hit['_source']['metadata']['additional_vecs']:
@@ -370,17 +433,28 @@ class QueryDocumentKNNRetriever(BaseRetriever):
             query_term=query_term,
             field=self.vector_field,
             size=self.top_k,
-            filter=filter
+            filter=filter,
         )
-        opensearch_knn_results = self.organize_results(opensearch_knn_response, self.index, self.source_field,
-                                                       self.text_field, self.using_whole_doc, self.context_num)[
-                                 :self.top_k]
+        opensearch_knn_results = self.organize_results(
+            opensearch_knn_response,
+            self.index,
+            self.source_field,
+            self.text_field,
+            self.using_whole_doc,
+            self.context_num,
+        )[: self.top_k]
         return opensearch_knn_results
 
     @timeit
-    def _get_relevant_documents(self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    def _get_relevant_documents(
+            self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
         query = question[self.query_key]
-        if "query_lang" in question and question["query_lang"] != self.lang and "translated_text" in question:
+        if (
+                "query_lang" in question
+                and question["query_lang"] != self.lang
+                and "translated_text" in question
+        ):
             query = question["translated_text"]
         debug_info = question["debug_info"]
         # query_repr = get_relevance_embedding(query, self.lang, self.embedding_model_endpoint, self.target_model,
@@ -398,17 +472,25 @@ class QueryDocumentKNNRetriever(BaseRetriever):
                 continue
             content_set.add(result["content"])
             # TODO add jsonlans
-            doc_list.append(Document(page_content=result["doc"],
-                                     metadata={"source": result["source"],
-                                               "retrieval_content": result["content"],
-                                               "retrieval_data": result["data"],
-                                               "retrieval_score": result["score"],
-                                               # "jsonlAnswer": result["detail"]["metadata"]["jsonlAnswer"],
-                                               #
-                                               # set common score for llm.
-                                               "score": result["score"]}))
+            doc_list.append(
+                Document(
+                    page_content=result["doc"],
+                    metadata={
+                        "source": result["source"],
+                        "retrieval_content": result["content"],
+                        "retrieval_data": result["data"],
+                        "retrieval_score": result["score"],
+                        # "jsonlAnswer": result["detail"]["metadata"]["jsonlAnswer"],
+                        #
+                        # set common score for llm.
+                        "score": result["score"],
+                    },
+                )
+            )
         if self.enable_debug:
-            debug_info[f"qd-knn-recall-{self.index}-{self.lang}"] = remove_redundancy_debug_info(opensearch_knn_results)
+            debug_info[f"qd-knn-recall-{self.index}-{self.lang}"] = (
+                remove_redundancy_debug_info(opensearch_knn_results)
+            )
         return doc_list
 
 
@@ -426,8 +508,15 @@ class QueryDocumentBM25Retriever(BaseRetriever):
     enable_debug: Any
     config: Dict = {"run_name": "BM25"}
 
-    def __init__(self, retriever_config: Dict, using_whole_doc=False, context_num=5, top_k=3, query_key='query',
-                 enable_debug=False):
+    def __init__(
+            self,
+            retriever_config: Dict,
+            using_whole_doc=False,
+            context_num=5,
+            top_k=3,
+            query_key="query",
+            enable_debug=False,
+    ):
         super().__init__()
         # self.index = workspace["open_search_index_name"]
         # self.vector_field = "vector_field"
@@ -436,9 +525,15 @@ class QueryDocumentBM25Retriever(BaseRetriever):
         # self.lang = workspace["languages"][0]
         # self.model_type = workspace["model_type"]
         self.index = retriever_config["index"]
-        self.vector_field = retriever_config["config"].get("vector_field_name", DEFAULT_VECTOR_FIELD_NAME)
-        self.text_field = retriever_config["config"].get("text_field_name", DEFAULT_TEXT_FIELD_NAME)
-        self.source_field = retriever_config["config"].get("source_field_name", DEFAULT_SOURCE_FIELD_NAME)
+        self.vector_field = retriever_config["config"].get(
+            "vector_field_name", DEFAULT_VECTOR_FIELD_NAME
+        )
+        self.text_field = retriever_config["config"].get(
+            "text_field_name", DEFAULT_TEXT_FIELD_NAME
+        )
+        self.source_field = retriever_config["config"].get(
+            "source_field_name", DEFAULT_SOURCE_FIELD_NAME
+        )
         self.top_k = int(retriever_config["config"].get("top_k", "3"))
         self.using_whole_doc = using_whole_doc
         self.context_num = context_num
@@ -467,8 +562,15 @@ class QueryDocumentBM25Retriever(BaseRetriever):
     #     return await asyncio.gather(*task_list)
 
     @timeit
-    def organize_results(self, response, aos_index=None, source_field="file_path", text_field="text",
-                         using_whole_doc=True, context_size=0):
+    def organize_results(
+            self,
+            response,
+            aos_index=None,
+            source_field="file_path",
+            text_field="text",
+            using_whole_doc=True,
+            context_size=0,
+    ):
         """
         Organize results from aos response
 
@@ -483,13 +585,13 @@ class QueryDocumentBM25Retriever(BaseRetriever):
             return results
         for aos_hit in aos_hits:
             result = {"data": {}}
-            source = aos_hit['_source']['metadata'][source_field]
+            source = aos_hit["_source"]["metadata"][source_field]
 
             result["source"] = source
             result["score"] = aos_hit["_score"]
-            result["detail"] = aos_hit['_source']
+            result["detail"] = aos_hit["_source"]
             # result["content"] = aos_hit['_source'][text_field]
-            result["content"] = aos_hit['_source'][text_field]
+            result["content"] = aos_hit["_source"][text_field]
             result["doc"] = result["content"]
             # if 'additional_vecs' in aos_hit['_source']['metadata'] and \
             #     'colbert_vecs' in aos_hit['_source']['metadata']['additional_vecs']:
@@ -522,17 +624,28 @@ class QueryDocumentBM25Retriever(BaseRetriever):
             query_term=query_term,
             field=self.text_field,
             size=self.top_k,
-            filter=filter
+            filter=filter,
         )
-        opensearch_bm25_results = self.organize_results(opensearch_bm25_response, self.index, self.source_field,
-                                                        self.text_field, self.using_whole_doc, self.context_num)[
-                                  :self.top_k]
+        opensearch_bm25_results = self.organize_results(
+            opensearch_bm25_response,
+            self.index,
+            self.source_field,
+            self.text_field,
+            self.using_whole_doc,
+            self.context_num,
+        )[: self.top_k]
         return opensearch_bm25_results
 
     @timeit
-    def _get_relevant_documents(self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    def _get_relevant_documents(
+            self, question: Dict, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
         query = question[self.query_key]
-        if "query_lang" in question and question["query_lang"] != self.lang and "translated_text" in question:
+        if (
+                "query_lang" in question
+                and question["query_lang"] != self.lang
+                and "translated_text" in question
+        ):
             query = question["translated_text"]
         debug_info = question["debug_info"]
         # query_repr = get_relevance_embedding(query, self.lang, self.embedding_model_endpoint, self.model_type)
@@ -546,16 +659,23 @@ class QueryDocumentBM25Retriever(BaseRetriever):
             if result["doc"] in content_set:
                 continue
             content_set.add(result["content"])
-            doc_list.append(Document(page_content=result["doc"],
-                                     metadata={"source": result["source"],
-                                               "retrieval_content": result["content"],
-                                               "retrieval_data": result["data"],
-                                               "retrieval_score": result["score"],
-                                               # set common score for llm.
-                                               "score": result["score"]}))
+            doc_list.append(
+                Document(
+                    page_content=result["doc"],
+                    metadata={
+                        "source": result["source"],
+                        "retrieval_content": result["content"],
+                        "retrieval_data": result["data"],
+                        "retrieval_score": result["score"],
+                        # set common score for llm.
+                        "score": result["score"],
+                    },
+                )
+            )
         if self.enable_debug:
-            debug_info[f"qd-bm25-recall-{self.index}-{self.lang}"] = remove_redundancy_debug_info(
-                opensearch_bm25_results)
+            debug_info[f"qd-bm25-recall-{self.index}-{self.lang}"] = (
+                remove_redundancy_debug_info(opensearch_bm25_results)
+            )
         return doc_list
 
 
@@ -564,10 +684,20 @@ def index_results_format(docs: list, threshold=-1):
     for doc in docs:
         if doc.metadata["score"] < threshold:
             continue
-        results.append({"score": doc.metadata["score"],
-                        "source": doc.metadata["source"],
-                        "answer": doc.metadata["answer"],
-                        "question": doc.metadata["question"]})
+        results.append(
+            {
+                "score": doc.metadata["score"],
+                "source": doc.metadata["source"],
+                "answer": doc.metadata["answer"],
+                "question": doc.metadata["question"],
+            }
+        )
     # output = {"answer": json.dumps(results, ensure_ascii=False), "sources": [], "contexts": []}
-    output = {"answer": results, "sources": [], "contexts": [], "context_docs": [], "context_sources": []}
+    output = {
+        "answer": results,
+        "sources": [],
+        "contexts": [],
+        "context_docs": [],
+        "context_sources": [],
+    }
     return output
