@@ -13,7 +13,7 @@ from common_logic.common_utils.lambda_invoke_utils import (
     is_running_local,
 )
 from utils import executor
-from utils.ddb_util import rest_get_bot_info
+from utils.bot_util import get_bot_info_from_table, scan_bot_info_from_table
 
 logger = get_logger("main")
 
@@ -27,28 +27,11 @@ region_name = os.environ.get("AWS_REGION", "us-west-2")
 bot_table_name = os.environ.get("BOT_TABLE_NAME", "")
 dynamodb_resource = boto3.resource("dynamodb")
 bot_table = dynamodb_resource.Table(bot_table_name)
-PROD_VERSION = "PROD"
-
-def get_bot_info(bot_id: str):
-    # Temporary Use
-    # TODO: Update this.
-    response = bot_table.scan()
-    bots = response['Items']
-
-    if len(bots) == 0:
-        raise RuntimeError("No bots created")
-    bot = bots[0]
-    model_kwargs = bot["llm"]["model_kwargs"]
-    model_kwargs["temperature"] = float(bot["llm"].get("temperature", "0.01"))
-    model_kwargs["max_tokens"] = int(bot["llm"].get("max_tokens", "4096"))
-    # print(bot)
-    return bot
-
 
 @chatbot_lambda_call_wrapper
 def lambda_handler(event_body: dict, context: dict):
     logger.info(json.dumps(event_body, indent=2))
-    if "query" in event_body:
+    if "query" in event_body and "ws_connection_id" in context:
         return web_socket_event_handler(event_body, context)
     else:
         return rest_api_event_handler(event_body, context)
@@ -126,7 +109,7 @@ def create_rest_api_agent_flow_body(event_body: dict, context: dict):
     agent_flow_body["use_history"] = True
     agent_flow_body["enable_trace"] = False
     agent_flow_body["session_id"] = session_id
-    agent_flow_body["chatbot_config"] = rest_get_bot_info(bot_id, PROD_VERSION)
+    agent_flow_body["chatbot_config"] = get_bot_info_from_table(bot_id)
     agent_flow_body["chat_history"] = chat_history
     agent_flow_body['request_timestamp'] = request_timestamp
     agent_flow_body['user_id'] = user_id
@@ -168,7 +151,7 @@ def create_ws_agent_flow_body(event_body: dict, context: dict):
 
     # bot id must exist in request body
     bot_id = event_body.get("bot_id", "")
-    event_body["chatbot_config"] = get_bot_info(bot_id)
+    event_body["chatbot_config"] = scan_bot_info_from_table(bot_id)
     event_body['stream'] = stream
     event_body["chat_history"] = chat_history
     event_body["ws_connection_id"] = ws_connection_id
@@ -198,6 +181,6 @@ def create_rest_api_llm_response_body(resp_message: dict, response: dict):
     else:
         response_body["category"] = response.get("current_agent_intent_type")
     response_body["intent_id"] = "i0"
-    response_body["intent_completed"] = "false"
+    response_body["intent_completed"] = "true"
 
     return response_body
