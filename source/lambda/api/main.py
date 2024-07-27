@@ -13,7 +13,7 @@ from utils.dao import BotDao
 from utils.aos_util import AOSUtil
 from model.intention import Intention
 
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from model.bot import Bot
 from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.shared.types import Annotated
@@ -29,7 +29,10 @@ region = os.environ.get("AWS_REGION")
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, strip_prefixes=["/v1"])
+cors_config = CORSConfig(allow_origin="*")
+app = APIGatewayRestResolver(
+    cors=cors_config, enable_validation=True, strip_prefixes=["/v1"]
+)
 # app.enable_swagger(path="/swagger")
 
 aos_util = AOSUtil()
@@ -58,9 +61,9 @@ def create_intention(bot_id: str, intention: Intention):
 @app.get("/bots/<bot_id>/intentions")
 @tracer.capture_method
 def list_intentions(
-    bot_id: str,
-    page: Annotated[int, Query(le=999)] = 1,
-    size: Annotated[int, Query(le=100)] = 20,
+        bot_id: str,
+        page: Annotated[int, Query(le=999)] = 1,
+        size: Annotated[int, Query(le=100)] = 20,
 ):
     start_from = (page - 1) * size
     bot = get_bot_by_id(bot_id)
@@ -78,8 +81,8 @@ def update_intention(bot_id: str, intention_id: str, intention: Intention):
 
     bot = get_bot_by_id(bot_id)
     index_name = bot.intention_retrievers[0].index
-
-    aos_util.update_doc(index_name, intention_id, intention)
+    emb_model_id = bot.intention_retrievers[0].embedding.model_id
+    aos_util.update_doc(index_name, emb_model_id, intention_id, intention)
 
     return {"statusCode": 200, "body": "Updated"}
 
@@ -174,7 +177,7 @@ def deploy_bot(bot_id: str) -> dict:
 )
 @tracer.capture_method
 def list_bots(
-    page: Annotated[int, Query(le=999)] = 1, size: Annotated[int, Query(le=100)] = 20
+        page: Annotated[int, Query(le=999)] = 1, size: Annotated[int, Query(le=100)] = 20
 ) -> list[Bot]:
     bots = bot_dao.list_bots(page, size)
     return bots

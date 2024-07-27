@@ -202,7 +202,32 @@ export class ApiConstruct extends Construct {
       },
     });
 
-    const methodOption = {
+    const methodOption_v1 = {
+      authorizer: auth,
+      apiKeyRequired: false,
+      methodResponses: [
+        {
+          statusCode: '200',
+          responseModels: {
+            'application/json': responseModel,
+          }
+        },
+        {
+          statusCode: '400',
+          responseModels: {
+            'application/json': apigw.Model.EMPTY_MODEL,
+          },
+        },
+        {
+          statusCode: '500',
+          responseModels: {
+            'application/json': apigw.Model.EMPTY_MODEL,
+          },
+        }
+      ]
+    };
+
+    const methodOption_llm = {
       authorizer: auth,
       apiKeyRequired: true,
       methodResponses: [
@@ -232,7 +257,7 @@ export class ApiConstruct extends Construct {
     // apiResourceEmbedding.addMethod("{proxy+}", lambdaEmbeddingIntegration, methodOption);
     apiResourceEmbedding.addProxy({
       defaultIntegration: lambdaEmbeddingIntegration,
-      defaultMethodOptions: methodOption,
+      defaultMethodOptions: methodOption_v1,
     })
 
 
@@ -300,11 +325,11 @@ export class ApiConstruct extends Construct {
 
     // Define the API Gateway Method
     const apiResourceLLM = api.root.addResource("llm");
-    apiResourceLLM.addMethod("POST", lambdaExecutorIntegration, methodOption);
+    apiResourceLLM.addMethod("POST", lambdaExecutorIntegration, methodOption_llm);
 
     apiResourceLLM.addProxy({
       defaultIntegration: lambdaExecutorIntegration,
-      defaultMethodOptions: methodOption
+      defaultMethodOptions: methodOption_llm
     })
 
     const plan = api.addUsagePlan('ExternalUsagePlan', {

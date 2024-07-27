@@ -1,15 +1,12 @@
 import os
 import json
 import boto3
+import hashlib
 from utils.secret_util import get_secret_value
 from requests.auth import HTTPBasicAuth
 from model.intention import Intention
-from utils.embedding_util import create_aos_ingestion, get_embedding_function
+from utils.embedding_util import append_embeddings, get_embedding_result
 from aws_lambda_powertools import Logger
-from langchain.docstore.document import Document
-from langchain_community.vectorstores.opensearch_vector_search import (
-    OpenSearchVectorSearch,
-)
 from opensearchpy import RequestsHttpConnection
 from opensearchpy import OpenSearch
 
@@ -53,30 +50,20 @@ class AOSUtil:
         return client
 
     def add_doc(self, index: str, emb_model_id: str, intention: Intention):
-        doc = Document(
-            page_content=intention.question,
-            metadata={
+        doc: dict = {
+            "text": intention.question,
+            "metadata": {
                 "source": "api",
                 "answer": intention.answer,
                 "kwargs": intention.kwargs,
                 "type": intention.type,
             },
-        )
+        }
 
-        embedding_function = get_embedding_function(region, emb_model_id)
+        appended_doc = append_embeddings(emb_model_id, index, self.opensearch_endpoint, HTTPBasicAuth(username, password), doc)
 
-        docsearch = OpenSearchVectorSearch(
-            index_name=index,
-            embedding_function=embedding_function,
-            opensearch_url=f"https://{self.opensearch_endpoint}",
-            http_auth=(username, password),
-            timeout=300,
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection,
-        )
-
-        create_aos_ingestion(emb_model_id, docsearch, [doc])
+        self.aos_client.create(index, hashlib.md5(str(appended_doc).encode('utf-8')).hexdigest(), appended_doc)
+        
 
     def list_doc(self, index: str, start_from: int, size: int):
         intention_list = []
@@ -106,11 +93,13 @@ class AOSUtil:
 
         return intention_list
 
-    def update_doc(self, index: str, body: dict, intention_id: str):
-        # TODO: Update this.
+    def update_doc(self, index: str, emb_model_id: str, body: dict, intention_id: str):
         question = body.get("question")
         answer = body.get("answer")
-        new_doc = {"doc": {"text": question, "metadata": {"jsonlAnswer": answer}}}
+
+        vector = get_embedding_result(emb_model_id, index, self.opensearch_endpoint, HTTPBasicAuth(username, password), question)
+
+        new_doc = {"doc": {"text": question, "metadata": {"answer": answer}, "vector_field":vector}}
 
         response = self.aos_client.update(index=index, id=intention_id, body=new_doc)
 
