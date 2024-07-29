@@ -50,20 +50,10 @@ class AOSUtil:
         return client
 
     def add_doc(self, index: str, emb_model_id: str, intention: Intention):
-        doc: dict = {
-            "text": intention.question,
-            "metadata": {
-                "source": "api",
-                "answer": intention.answer,
-                "kwargs": intention.kwargs,
-                "type": intention.type,
-            },
-        }
 
-        appended_doc = append_embeddings(emb_model_id, index, self.opensearch_endpoint, HTTPBasicAuth(username, password), doc)
+        appended_doc = append_embeddings(emb_model_id, intention)
 
         self.aos_client.create(index, hashlib.md5(str(appended_doc).encode('utf-8')).hexdigest(), appended_doc)
-        
 
     def list_doc(self, index: str, start_from: int, size: int):
         intention_list = []
@@ -80,24 +70,24 @@ class AOSUtil:
         hits = result.get("hits")
 
         for hit in hits.get("hits"):
-            print(hit["_source"])
             intention_dict = {}
-            intention_dict["_id"] = hit.get("_id")
+            intention_id = hit.get("_id")
             source = hit.get("_source")
-            intention_dict["text"] = source.get("text")
+            question = source.get("text")
             metadata = source.get("metadata")
-            intention_dict["answer"] = metadata.get("intent")
-            intention_dict["kwargs"] = metadata.get("kwargs")
-            intention_dict["type"] = metadata.get("type")
+            intent = metadata.get("answer")
+            kwargs = metadata.get("kwargs")
+            intent_type = metadata.get("type")
+            intention_dict = {"intention_id": intention_id, "question":question, "answer":{"intent":intent, "kwargs":kwargs, "type": intent_type}}
             intention_list.append(intention_dict)
 
         return intention_list
 
-    def update_doc(self, index: str, emb_model_id: str, body: dict, intention_id: str):
-        question = body.get("question")
-        answer = body.get("answer")
+    def update_doc(self, index: str, emb_model_id: str, intention: dict, intention_id: str):
+        question = intention.question
+        answer = intention.answer
 
-        vector = get_embedding_result(emb_model_id, index, self.opensearch_endpoint, HTTPBasicAuth(username, password), question)
+        vector = get_embedding_result(emb_model_id, question)
 
         new_doc = {"doc": {"text": question, "metadata": {"answer": answer}, "vector_field":vector}}
 
