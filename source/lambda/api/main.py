@@ -18,11 +18,7 @@ from model.bot import Bot
 from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.shared.types import Annotated
 from aws_lambda_powertools.event_handler.exceptions import (
-    BadRequestError,
-    InternalServerError,
-    NotFoundError,
-    ServiceError,
-    UnauthorizedError,
+    BadRequestError
 )
 
 region = os.environ.get("AWS_REGION")
@@ -81,8 +77,8 @@ def update_intention(bot_id: str, intention_id: str, intention: Intention):
 
     bot = get_bot_by_id(bot_id)
     index_name = bot.intention_retrievers[0].index
-
-    aos_util.update_doc(index_name, intention_id, intention)
+    emb_model_id = bot.intention_retrievers[0].embedding.model_id
+    aos_util.update_doc(index_name, emb_model_id, intention, intention_id)
 
     return {"statusCode": 200, "body": "Updated"}
 
