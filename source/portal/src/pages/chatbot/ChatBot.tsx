@@ -6,8 +6,12 @@ import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
+  ColumnLayout,
+  ExpandableSection,
+  FormField,
   Select,
   SelectProps,
+  SpaceBetween,
   StatusIndicator,
   Textarea,
   Toggle,
@@ -16,11 +20,8 @@ import useWebSocket, { ReadyState } from 'react-use-websocket';
 import { identity } from 'lodash';
 import ConfigContext from 'src/context/config-context';
 import { useAuth } from 'react-oidc-context';
-import {
-  LLM_BOT_CHAT_MODE_LIST,
-} from 'src/utils/const';
 import { v4 as uuidv4 } from 'uuid';
-import { MessageDataType, SessionMessage } from 'src/types';
+import {Bot, MessageDataType, SessionMessage} from 'src/types';
 
 interface MessageType {
   type: 'ai' | 'human';
@@ -61,16 +62,24 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
   const [currentAIMessage, setCurrentAIMessage] = useState('');
   const [currentMonitorMessage, setCurrentMonitorMessage] = useState('');
   const [aiSpeaking, setAiSpeaking] = useState(false);
-  const [chatModeOption, setChatModeOption] = useState<SelectProps.Option>(
-    LLM_BOT_CHAT_MODE_LIST[0],
+  const [botOptionList, setBotOptionList] = useState<SelectProps.Option[]>([]);
+  const [botOption, setBotOption] = useState<SelectProps.Option | null>(
+    null,
   );
+  const [userProfileOptionList, setUserProfileOptionList] = useState<SelectProps.Option[]>([]);
+  const [userProfileOption, setUserProfileOption] = useState<SelectProps.Option | null>(
+    null,
+  );
+  const [bots, setBots] = useState<Bot[]>(
+    [],
+  );
+
   const [useChatHistory, setUseChatHistory] = useState(true);
   const [enableTrace, setEnableTrace] = useState(true);
   const [showTrace, setShowTrace] = useState(true);
-
+  const [botSettingExpand, setBotSettingExpand] = useState(false);
 
   const [sessionId, setSessionId] = useState(historySessionId);
-  const [botId, setBotId] = useState('');
   const [showMessageError, setShowMessageError] = useState(false);
   // const [googleAPIKeyError, setGoogleAPIKeyError] = useState(false);
   const [isMessageEnd, setIsMessageEnd] = useState(false);
@@ -88,13 +97,34 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
 
     const getBotList = async () => {
     try {
-      console.log("get bots")
+      console.log('Load bots')
       const data = await fetchData({
         url: 'v1/bots',
         method: 'get',
       });
-      console.log(data)
-      setBotId(data[0].bot_id)
+
+      const getBots: Bot[] = data.map((b: any) => ({
+        botId: b.bot_id,
+        userProfiles: b.user_profiles || ["default"],
+      }))
+      setBots(getBots)
+
+      const getBotOptions = getBots.map((bot: Bot) => {
+        return {
+          label: bot.botId,
+          value: bot.botId,
+        };
+      });
+
+      const getUserProfileOptions = getBots[0].userProfiles.map((p:string) => ({
+        label: p,
+        value: p
+      }))
+      setBotOptionList(getBotOptions)
+      setBotOption(getBotOptions[0])
+      setUserProfileOptionList(getUserProfileOptions)
+      setUserProfileOption(getUserProfileOptions[0])
+
     } catch (error) {
       console.error(error);
     }
@@ -238,10 +268,10 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
       query: userMessage,
       entry_type: "common",
       session_id: sessionId,
-      user_profile:  chatModeOption.value,
+      user_profile:  userProfileOption?.value,
       use_history: useChatHistory,
       enable_trace: enableTrace,
-      bot_id: botId,
+      bot_id: botOption?.value,
     };
 
 
@@ -294,37 +324,37 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
 
         <div className="flex-v gap-10">
           <div className="flex gap-5 send-message">
-            <Select
-              options={LLM_BOT_CHAT_MODE_LIST}
-              selectedOption={chatModeOption}
-              onChange={({ detail }) => {
-                setChatModeOption(detail.selectedOption);
-              }}
-            />
+            {/*<Select*/}
+            {/*    options={LLM_BOT_CHAT_MODE_LIST}*/}
+            {/*    selectedOption={chatModeOption}*/}
+            {/*    onChange={({detail}) => {*/}
+            {/*      setChatModeOption(detail.selectedOption);*/}
+            {/*    }}*/}
+            {/*/>*/}
             <div className="flex-1 pr">
               <Textarea
-                invalid={showMessageError}
-                rows={1}
-                value={userMessage}
-                placeholder={t('typeMessage')}
-                onChange={(e) => {
-                  setShowMessageError(false);
-                  setUserMessage(e.detail.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.detail.key === 'Enter') {
-                    e.preventDefault();
-                    handleClickSendMessage();
-                  }
-                }}
+                  invalid={showMessageError}
+                  rows={1}
+                  value={userMessage}
+                  placeholder={t('typeMessage')}
+                  onChange={(e) => {
+                    setShowMessageError(false);
+                    setUserMessage(e.detail.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.detail.key === 'Enter') {
+                      e.preventDefault();
+                      handleClickSendMessage();
+                    }
+                  }}
               />
             </div>
             <div>
               <Button
-                disabled={aiSpeaking || readyState !== ReadyState.OPEN}
-                onClick={() => {
-                  handleClickSendMessage();
-                }}
+                  disabled={aiSpeaking || readyState !== ReadyState.OPEN || botOption?.value == undefined}
+                  onClick={() => {
+                    handleClickSendMessage();
+                  }}
               >
                 {t('button.send')}
               </Button>
@@ -334,24 +364,24 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
             <div className="flex space-between">
               <div className="flex gap-10 align-center">
                 <Toggle
-                  onChange={({ detail }) => setUseChatHistory(detail.checked)}
-                  checked={useChatHistory}
+                    onChange={({detail}) => setUseChatHistory(detail.checked)}
+                    checked={useChatHistory}
                 >
                   {t('multiRound')}
                 </Toggle>
                 <Toggle
-                  onChange={({ detail }) => setEnableTrace(detail.checked)}
-                  checked={enableTrace}
+                    onChange={({detail}) => setEnableTrace(detail.checked)}
+                    checked={enableTrace}
                 >
                   {t('enableTrace')}
                 </Toggle>
                 {enableTrace && (
-                  <Toggle
-                    onChange={({ detail }) => setShowTrace(detail.checked)}
-                    checked={showTrace}
-                  >
-                    {t('showTrace')}
-                  </Toggle>
+                    <Toggle
+                        onChange={({detail}) => setShowTrace(detail.checked)}
+                        checked={showTrace}
+                    >
+                      {t('showTrace')}
+                    </Toggle>
                 )}
                 {/*{chatModeOption.value === 'agent' && (*/}
                 {/*  <Toggle*/}
@@ -394,6 +424,69 @@ const ChatBot: React.FC<ChatBotProps> = (props: ChatBotProps) => {
                 </StatusIndicator>
               </div>
             </div>
+          </div>
+          <div>
+            <ExpandableSection
+                onChange={({detail}) => {
+                  setBotSettingExpand(detail.expanded);
+                }}
+                expanded={botSettingExpand}
+                // variant="footer"
+                headingTagOverride="h4"
+                headerText={t('botSettings')}
+            >
+              <SpaceBetween direction="vertical" size="l">
+                <ColumnLayout columns={3} variant="text-grid">
+                  <FormField label={t('bots')} stretch={true}>
+                    <Select
+                        options={botOptionList}
+                        selectedOption={botOption}
+                        onChange={({detail}) => {
+                          setBotOption(detail.selectedOption);
+                          const selectedBot = bots.find((b) => b.botId === detail.selectedOption.value)
+                          console.log("Selected "+ selectedBot?.botId)
+                          if (selectedBot != undefined) {
+                            const getUserProfileOptions = selectedBot.userProfiles.map((p:string) => ({
+                                label: p,
+                                value: p,
+                            }))
+                            setUserProfileOptionList(getUserProfileOptions)
+                            setUserProfileOption(getUserProfileOptions[0])
+                          }
+                        }}
+                        placeholder={t('validation.requireBot')}
+                        empty={t('noBotFound')}
+                    />
+                    {/*{botOption && (*/}
+                    {/*    <div style={{minWidth: 300}}>*/}
+                    {/*      <Select*/}
+                    {/*          options={botOptionList}*/}
+                    {/*          selectedOption={botOption}*/}
+                    {/*          onChange={({detail}) => {*/}
+                    {/*            setBotOption(detail.selectedOption);*/}
+                    {/*          }}*/}
+                    {/*      />*/}
+                    {/*    </div>*/}
+                    {/*)}*/}
+                  </FormField>
+                  <SpaceBetween size="xs">
+                    <FormField
+                        label={t('userProfile')}
+                        stretch={true}
+                    >
+                      <Select
+                          onChange={({detail}) => {
+                            setUserProfileOption(detail.selectedOption);
+                          }}
+                          selectedOption={userProfileOption}
+                          options={userProfileOptionList}
+                          placeholder={t('validation.requireUserProfile')}
+                      />
+                    </FormField>
+                  </SpaceBetween>
+                </ColumnLayout>
+              </SpaceBetween>
+            </ExpandableSection>
           </div>
         </div>
       </div>

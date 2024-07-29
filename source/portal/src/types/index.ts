@@ -130,3 +130,8 @@ export interface GetPromptResponse {
   Scene: string;
   Prompt: Prompt;
 }
+
+export interface Bot {
+  botId: string
+  userProfiles: string[]
+}

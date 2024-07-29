@@ -34,10 +34,6 @@ export const LLM_BOT_CHAT_MODE_LIST: SelectProps.Option[] = [
     label: 'Agent',
     value: 'agent',
   },
-  {
-    label: 'Host',
-    value: 'host',
-  },
 ];
 
 export const SCENARIO_LIST: SelectProps.Option[] = [
@@ -45,10 +41,6 @@ export const SCENARIO_LIST: SelectProps.Option[] = [
     label: 'common',
     value: 'common',
   },
-  // {
-  //   label: 'retail',
-  //   value: 'retail',
-  // },
 ];
 
 
