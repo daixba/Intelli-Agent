@@ -6,7 +6,7 @@ from common_logic.common_utils.exceptions import (
     ToolNotExistError,
     ToolParameterNotExistError,
     MultipleToolNameError,
-    ToolNotFound
+    ToolNotFound,
 )
 from common_logic.common_utils.lambda_invoke_utils import (
     invoke_lambda,
@@ -25,10 +25,10 @@ from common_logic.common_utils.constant import (
     LLMTaskType,
     ToolRuningMode,
     SceneType,
-    ChatbotMode
+    ChatbotMode,
 )
 
-logger = get_logger('common_executor')
+logger = get_logger("common_executor")
 
 
 class ChatbotState(TypedDict):
@@ -101,6 +101,7 @@ class ChatbotState(TypedDict):
 # nodes in graph #
 ####################
 
+
 @node_monitor_wrapper
 def query_preprocess(state: ChatbotState):
     output: str = invoke_lambda(
@@ -110,7 +111,12 @@ def query_preprocess(state: ChatbotState):
         handler_name="lambda_handler",
     )
 
-    send_trace(f"\n\n**query_rewrite:** \n{output}", state["stream"], state["ws_connection_id"], state["enable_trace"])
+    send_trace(
+        f"\n\n**query_rewrite:** \n{output}",
+        state["stream"],
+        state["ws_connection_id"],
+        state["enable_trace"],
+    )
     return {"query_rewrite": output}
 
 
@@ -155,7 +161,10 @@ def intention_detection(state: ChatbotState):
 
     send_trace(
         f"**intention retrieved:**\n{json.dumps(intent_fewshot_examples, ensure_ascii=False, indent=2)}",
-        state["stream"], state["ws_connection_id"], state["enable_trace"])
+        state["stream"],
+        state["ws_connection_id"],
+        state["enable_trace"],
+    )
     return {
         "intent_fewshot_examples": intent_fewshot_examples,
         "intent_fewshot_tools": intent_fewshot_tools,
@@ -171,23 +180,32 @@ def agent(state: ChatbotState):
     # 2. for the first time, agent decides to give final results
 
     # deal with once tool calling
-    if state['agent_repeated_call_validation'] and state['function_calling_parse_ok'] and state['agent_tool_history']:
-        tool_execute_res = state['agent_tool_history'][-1]['additional_kwargs']['raw_tool_call_results'][0]
-        tool_name = tool_execute_res['name']
-        output = tool_execute_res['output']
+    if (
+            state["agent_repeated_call_validation"]
+            and state["function_calling_parse_ok"]
+            and state["agent_tool_history"]
+    ):
+        tool_execute_res = state["agent_tool_history"][-1]["additional_kwargs"][
+            "raw_tool_call_results"
+        ][0]
+        tool_name = tool_execute_res["name"]
+        output = tool_execute_res["output"]
         tool = get_tool_by_name(tool_name, scene=SceneType.COMMON)
         if tool.running_mode == ToolRuningMode.ONCE:
             send_trace("once tool", enable_trace=state["enable_trace"])
-            return {
-                "answer": output['result'],
-                "function_calling_is_run_once": True
-            }
+            return {"answer": output["result"], "function_calling_is_run_once": True}
 
-    no_intention_condition = not state['intent_fewshot_examples']
+    no_intention_condition = not state["intent_fewshot_examples"]
     first_tool_final_response = False
-    if (state['agent_current_call_number'] == 1) and state['function_calling_parse_ok'] and state['agent_tool_history']:
-        tool_execute_res = state['agent_tool_history'][-1]['additional_kwargs']['raw_tool_call_results'][0]
-        tool_name = tool_execute_res['name']
+    if (
+            (state["agent_current_call_number"] == 1)
+            and state["function_calling_parse_ok"]
+            and state["agent_tool_history"]
+    ):
+        tool_execute_res = state["agent_tool_history"][-1]["additional_kwargs"][
+            "raw_tool_call_results"
+        ][0]
+        tool_name = tool_execute_res["name"]
         if tool_name == "give_final_response":
             first_tool_final_response = True
 
@@ -249,7 +267,7 @@ def agent(state: ChatbotState):
 
 
 def final_results_preparation(state: ChatbotState):
-    return {"answer": state['answer']}
+    return {"answer": state["answer"]}
 
 
 def matched_query_return(state: ChatbotState):
@@ -273,7 +291,9 @@ def agent_route(state: dict):
     if state.get("function_calling_is_run_once", False):
         return "no need tool calling"
 
-    state["agent_repeated_call_validation"] = state['agent_current_call_number'] < state['agent_repeated_call_limit']
+    state["agent_repeated_call_validation"] = (
+            state["agent_current_call_number"] < state["agent_repeated_call_limit"]
+    )
 
     if state["agent_repeated_call_validation"]:
         return "valid tool calling"
@@ -285,6 +305,7 @@ def agent_route(state: dict):
 #############################
 # define online top-level graph for app #
 #############################
+
 
 def build_graph(chatbot_state_cls):
     workflow = StateGraph(chatbot_state_cls)
@@ -389,7 +410,9 @@ def run(event_body):
 
     ################################################################################
     # prepare inputs and invoke graph
-    logger.info(f'event_body:\n{json.dumps(event_body, ensure_ascii=False, indent=2, cls=JSONEncoder)}')
+    logger.info(
+        f"event_body:\n{json.dumps(event_body, ensure_ascii=False, indent=2, cls=JSONEncoder)}"
+    )
 
     chatbot_config = event_body["chatbot_config"]
     query = event_body["query"]
@@ -428,7 +451,7 @@ def run(event_body):
     return {"answer": response["answer"], **response["extra_response"]}
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     event_body = {
         "query": "Hello",
         # "entry_type": "common",
@@ -461,53 +484,38 @@ if __name__ == '__main__':
                     },
                     "embedding": {
                         "type": "Bedrock",
-                        "model_id": "amazon.titan-embed-text-v2:0"
-                    }
+                        "model_id": "amazon.titan-embed-text-v2:0",
+                    },
                 }
             ],
             "intention_retrievers": [
                 {
-                    "index": "test-intent3",
-                    "config": {
-                        "top_k": "3"
-                    },
+                    "index": "test-intent",
+                    "config": {"top_k": "3"},
                     "embedding": {
                         "type": "Bedrock",
-                        "model_id": "cohere.embed-english-v3"
-                    }
+                        "model_id": "cohere.embed-multilingual-v3",
+                    },
                 }
             ],
             "llm": {
                 "type": "Bedrock",
                 "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
-                "model_kwargs": {
-                    "temperature": 0.0,
-                    "max_tokens": 4096
-                }
+                "model_kwargs": {"temperature": 0.0, "max_tokens": 4096},
             },
             "prompts": [
                 {
                     "type": "RAG",
-                    "text": "You are a customer service chatbot. You ALWAYS follow these guidelines when writing your response to user's query:\n<guidelines>\n- NERVER say \"\u6839\u636e\u641c\u7d22\u7ed3\u679c/\u5927\u5bb6\u597d/\u8c22\u8c22...\".\n</guidelines>\n\nHere are some documents for you to reference for your query.\n<docs>\n{context}\n</docs>"},
-                {
-                    "type": "GENERAL",
-                    "text": "You are a customer service chatbot."
+                    "text": 'You are a customer service chatbot. You ALWAYS follow these guidelines when writing your response to user\'s query:\n<guidelines>\n- NERVER say "\u6839\u636e\u641c\u7d22\u7ed3\u679c/\u5927\u5bb6\u597d/\u8c22\u8c22...".\n</guidelines>\n\nHere are some documents for you to reference for your query.\n<docs>\n{context}\n</docs>',
                 },
+                {"type": "GENERAL", "text": "You are a customer service chatbot."},
                 {
                     "type": "CONV_SUMMARY",
-                    "text": "Given the following conversation between `USER` and `AI`, and a follow up `USER` reply, Put yourself in the shoes of `USER`, rephrase the follow up `USER` reply to be a standalone reply.\n\nChat History:\n{history}\n\nThe USER's follow up reply: {question}"
-                }
-            ],
-            "tools": [
-                {
-                    "name": "get_weather"
+                    "text": "Given the following conversation between `USER` and `AI`, and a follow up `USER` reply, Put yourself in the shoes of `USER`, rephrase the follow up `USER` reply to be a standalone reply.\n\nChat History:\n{history}\n\nThe USER's follow up reply: {question}",
                 },
-                {
-                    "name": "comfort"
-                }
-            ]
+            ],
+            "tools": [{"name": "get_weather"}, {"name": "comfort"}],
         },
-
     }
     resp = run(event_body)
     print("Final response> ", resp)

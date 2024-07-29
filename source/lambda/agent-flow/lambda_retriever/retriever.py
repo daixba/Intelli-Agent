@@ -7,12 +7,18 @@ import logging
 import boto3
 import sys
 
-from lambda_retriever.utils.aos_retrievers import QueryDocumentKNNRetriever, QueryDocumentBM25Retriever, \
-    QueryQuestionRetriever
+from lambda_retriever.utils.aos_retrievers import (
+    QueryDocumentKNNRetriever,
+    QueryDocumentBM25Retriever,
+    QueryQuestionRetriever,
+)
 from lambda_retriever.utils.reranker import MergeReranker
 from lambda_retriever.utils.context_utils import retriever_results_format
 
-from langchain.retrievers import ContextualCompressionRetriever, AmazonKnowledgeBasesRetriever
+from langchain.retrievers import (
+    ContextualCompressionRetriever,
+    AmazonKnowledgeBasesRetriever,
+)
 from langchain_community.retrievers import AmazonKnowledgeBasesRetriever
 
 from langchain.retrievers.merger_retriever import MergerRetriever
@@ -38,7 +44,8 @@ def get_bedrock_kb_retrievers(knowledge_base_id_list, top_k: int):
     retriever_list = [
         AmazonKnowledgeBasesRetriever(
             knowledge_base_id=knowledge_base_id,
-            retrieval_config={"vectorSearchConfiguration": {"numberOfResults": top_k}})
+            retrieval_config={"vectorSearchConfiguration": {"numberOfResults": top_k}},
+        )
         for knowledge_base_id in knowledge_base_id_list
     ]
     return retriever_list
@@ -49,33 +56,24 @@ def get_custom_qd_retrievers(retriever_config, using_bm25=False):
         "using_whole_doc": False,
         "context_num": 1,
         "top_k": 10,
-        "query_key": "query"
+        "query_key": "query",
     }
     # qd_config = {**default_qd_config, **qd_config}
-    retriever_list = [
-        QueryDocumentKNNRetriever(
-            retriever_config
-        )
-    ]
+    retriever_list = [QueryDocumentKNNRetriever(retriever_config)]
     if using_bm25:
-        retriever_list += [
-            QueryDocumentBM25Retriever(
-                retriever_config
-            )
-        ]
+        retriever_list += [QueryDocumentBM25Retriever(retriever_config)]
     return retriever_list
 
 
 def get_custom_qq_retrievers(retriever_config):
-    default_qq_config = {
-        "top_k": 10,
-        "query_key": "query"
-    }
+    default_qq_config = {"top_k": 10, "query_key": "query"}
 
-    return [QueryQuestionRetriever(
-        retriever_config,
-        # **qq_config
-    )]
+    return [
+        QueryQuestionRetriever(
+            retriever_config,
+            # **qq_config
+        )
+    ]
 
 
 def get_whole_chain(retriever_list, reranker_config):
@@ -96,7 +94,8 @@ def get_whole_chain(retriever_list, reranker_config):
         base_compressor=compressor, base_retriever=lotr
     )
     whole_chain = RunnablePassthrough.assign(
-        docs=compression_retriever | RunnableLambda(retriever_results_format))
+        docs=compression_retriever | RunnableLambda(retriever_results_format)
+    )
     return whole_chain
 
 
@@ -135,52 +134,48 @@ def lambda_handler(event, context=None):
 
 
 if __name__ == "__main__":
-    query = '''test'''
+    query = """test"""
     event = {
-        "body":
-            json.dumps(
-                {
-                    "retrievers": [
-                        {
-                            "index": "test-intent",
-                            "config": {
-                                "top_k": 3
-                            },
-                            "embedding": {
-                                "type": "Bedrock",
-                                "model_id": "cohere.embed-english-v3"
-                            }
-                        }
-                    ],
-                    "query": query,
-                    "type": "qq"
-                }
-            )
+        "body": json.dumps(
+            {
+                "retrievers": [
+                    {
+                        "index": "test-intent",
+                        "config": {"top_k": "3"},
+                        "embedding": {
+                            "type": "Bedrock",
+                            "model_id": "cohere.embed-multilingual-v3",
+                        },
+                    }
+                ],
+                "query": query,
+                "type": "qq",
+            }
+        )
     }
 
     event2 = {
-        "body":
-            json.dumps(
-                {
-                    "retrievers": [
-                        {
-                            "index": "test-qa",
-                            "config": {
-                                "top_k": "3",
-                                "vector_field_name": "sentence_vector",
-                                "text_field_name": "paragraph",
-                                "source_field_name": "source"
-                            },
-                            "embedding": {
-                                "type": "Bedrock",
-                                "model_id": "amazon.titan-embed-text-v2:0"
-                            }
-                        }
-                    ],
-                    "query": query,
-                    "type": "qd"
-                }
-            )
+        "body": json.dumps(
+            {
+                "retrievers": [
+                    {
+                        "index": "test-qa",
+                        "config": {
+                            "top_k": "3",
+                            "vector_field_name": "sentence_vector",
+                            "text_field_name": "paragraph",
+                            "source_field_name": "source",
+                        },
+                        "embedding": {
+                            "type": "Bedrock",
+                            "model_id": "amazon.titan-embed-text-v2:0",
+                        },
+                    }
+                ],
+                "query": query,
+                "type": "qd",
+            }
+        )
     }
 
     response = lambda_handler(event2, None)

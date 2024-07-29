@@ -1,5 +1,8 @@
 from common_logic.common_utils.logger_utils import get_logger
-from common_logic.common_utils.lambda_invoke_utils import chatbot_lambda_call_wrapper, invoke_lambda
+from common_logic.common_utils.lambda_invoke_utils import (
+    chatbot_lambda_call_wrapper,
+    invoke_lambda,
+)
 import json
 import pathlib
 
@@ -8,18 +11,18 @@ logger = get_logger("intention")
 
 @chatbot_lambda_call_wrapper
 def lambda_handler(state: dict, context=None):
-    query_key = "query"
+    query_key = "query_rewrite"
     event_body = {
         "query": state[query_key],
         "type": "qq",
-        "retrievers": state['chatbot_config'].get("intention_retrievers", [])
+        "retrievers": state["chatbot_config"].get("intention_retrievers", []),
     }
     # call retriver
     res: list[dict] = invoke_lambda(
-        lambda_name='Online_Function_Retriever',
+        lambda_name="Online_Function_Retriever",
         lambda_module_path="lambda_retriever.retriever",
-        handler_name='lambda_handler',
-        event_body=event_body
+        handler_name="lambda_handler",
+        event_body=event_body,
     )
 
     # if not res['result']['docs']:
@@ -51,14 +54,16 @@ def lambda_handler(state: dict, context=None):
     #
     #
     # else:
-
-    intention_fewshot_examples = [{
-        "query": doc['page_content'],
-        "score": doc['score'],
-        "name": doc['answer']['jsonlAnswer']['intent'],
-        "intent": doc['answer']['jsonlAnswer']['intent'],
-        "kwargs": doc['answer']['jsonlAnswer'].get('kwargs', {}),
-    } for doc in res['result']['docs'] if doc['score'] > 0.4
+    intention_fewshot_examples = [
+        {
+            "query": doc["page_content"],
+            "score": doc["score"],
+            "name": doc["answer"],
+            "intent": doc["answer"],
+            "kwargs": doc["kwargs"],
+        }
+        for doc in res["result"]["docs"]
+        if doc["score"] > 0.4
     ]
 
     return intention_fewshot_examples

@@ -229,7 +229,7 @@ export class ApiConstruct extends Construct {
 
     const methodOption_llm = {
       authorizer: auth,
-      apiKeyRequired: true,
+      // apiKeyRequired: true,
       methodResponses: [
         {
           statusCode: '200',

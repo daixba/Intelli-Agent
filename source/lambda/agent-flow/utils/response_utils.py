@@ -22,19 +22,17 @@ def write_chat_history_to_ddb(
         entry_type,
         additional_kwargs=None,
 ):
-    # TODO: Update this.
-    # ddb_obj.add_user_message(
-    #     f"user_{message_id}", custom_message_id, entry_type, query, additional_kwargs
-    # )
-    # ddb_obj.add_ai_message(
-    #     f"ai_{message_id}",
-    #     custom_message_id,
-    #     entry_type,
-    #     answer,
-    #     input_message_id=f"user_{message_id}",
-    #     additional_kwargs=additional_kwargs
-    # )
-    pass
+    ddb_obj.add_user_message(
+        f"user_{message_id}", custom_message_id, entry_type, query, additional_kwargs
+    )
+    ddb_obj.add_ai_message(
+        f"ai_{message_id}",
+        custom_message_id,
+        entry_type,
+        answer,
+        input_message_id=f"user_{message_id}",
+        additional_kwargs=additional_kwargs,
+    )
 
 
 def api_response(event_body: dict, response: dict):
@@ -46,25 +44,22 @@ def api_response(event_body: dict, response: dict):
         answer = json.dumps(answer, ensure_ascii=False)
 
     write_chat_history_to_ddb(
-        query=event_body['query'],
+        query=event_body["query"],
         answer=answer,
         ddb_obj=ddb_history_obj,
-        message_id=event_body['message_id'],
-        custom_message_id=event_body['custom_message_id'],
-        entry_type=event_body['entry_type'],
-        additional_kwargs=response.get("ddb_additional_kwargs", {})
+        message_id=event_body["message_id"],
+        custom_message_id=event_body["custom_message_id"],
+        entry_type=event_body["entry_type"],
+        additional_kwargs=response.get("ddb_additional_kwargs", {}),
     )
 
     return {
-        "session_id": event_body['session_id'],
-        "entry_type": event_body['entry_type'],
+        "session_id": event_body["session_id"],
+        "entry_type": event_body["entry_type"],
         "created": time.time(),
         "total_time": time.time() - event_body["request_timestamp"],
-        "message": {
-            "role": "assistant",
-            "content": answer
-        },
-        **response
+        "message": {"role": "assistant", "content": answer},
+        **response,
     }
 
 
@@ -83,12 +78,13 @@ def stream_response(event_body: dict, response: dict):
     ddb_history_obj = event_body["ddb_history_obj"]
 
     try:
-        send_to_ws_client(message={
-            "message_type": StreamMessageType.START,
-            "message_id": f"ai_{message_id}",
-            "custom_message_id": custom_message_id,
-        },
-            ws_connection_id=ws_connection_id
+        send_to_ws_client(
+            message={
+                "message_type": StreamMessageType.START,
+                "message_id": f"ai_{message_id}",
+                "custom_message_id": custom_message_id,
+            },
+            ws_connection_id=ws_connection_id,
         )
         answer_str = ""
 
@@ -102,18 +98,19 @@ def stream_response(event_body: dict, response: dict):
                     f"{custom_message_id} running time of first token whole {entry_type} entry: {first_token_time - request_timestamp}s"
                 )
             chunk = filter_sentence_fn(chunk)
-            send_to_ws_client(message={
-                "message_type": StreamMessageType.CHUNK,
-                "message_id": f"ai_{message_id}",
-                "custom_message_id": custom_message_id,
-                "message": {
-                    "role": "assistant",
-                    "content": chunk,
-                    # "knowledge_sources": sources,
+            send_to_ws_client(
+                message={
+                    "message_type": StreamMessageType.CHUNK,
+                    "message_id": f"ai_{message_id}",
+                    "custom_message_id": custom_message_id,
+                    "message": {
+                        "role": "assistant",
+                        "content": chunk,
+                        # "knowledge_sources": sources,
+                    },
+                    "chunk_id": i,
                 },
-                "chunk_id": i,
-            },
-                ws_connection_id=ws_connection_id
+                ws_connection_id=ws_connection_id,
             )
 
             answer_str += chunk
@@ -126,13 +123,13 @@ def stream_response(event_body: dict, response: dict):
         logger.info(f"answer: {answer_str}")
 
         write_chat_history_to_ddb(
-            query=event_body['query'],
+            query=event_body["query"],
             answer=answer_str,
             ddb_obj=ddb_history_obj,
             message_id=message_id,
             custom_message_id=custom_message_id,
             entry_type=entry_type,
-            additional_kwargs=response.get("ddb_additional_kwargs", {})
+            additional_kwargs=response.get("ddb_additional_kwargs", {}),
         )
 
         # sed source and contexts
@@ -141,12 +138,9 @@ def stream_response(event_body: dict, response: dict):
                 "message_type": StreamMessageType.CONTEXT,
                 "message_id": f"ai_{message_id}",
                 "custom_message_id": custom_message_id,
-                **response
+                **response,
             }
-            send_to_ws_client(
-                message=context_msg,
-                ws_connection_id=ws_connection_id
-            )
+            send_to_ws_client(message=context_msg, ws_connection_id=ws_connection_id)
 
         # send end
         send_to_ws_client(
@@ -155,7 +149,7 @@ def stream_response(event_body: dict, response: dict):
                 "message_id": f"ai_{message_id}",
                 "custom_message_id": custom_message_id,
             },
-            ws_connection_id=ws_connection_id
+            ws_connection_id=ws_connection_id,
         )
     except WebsocketClientError:
         error = traceback.format_exc()
@@ -172,7 +166,7 @@ def stream_response(event_body: dict, response: dict):
                 "custom_message_id": custom_message_id,
                 "message": {"content": error},
             },
-            ws_connection_id=ws_connection_id
+            ws_connection_id=ws_connection_id,
         )
 
 
