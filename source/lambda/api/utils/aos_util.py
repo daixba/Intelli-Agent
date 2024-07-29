@@ -83,13 +83,14 @@ class AOSUtil:
 
         return intention_list
 
-    def update_doc(self, index: str, emb_model_id: str, intention: dict, intention_id: str):
+    def update_doc(self, index: str, emb_model_id: str, intention: Intention, intention_id: str):
         question = intention.question
         answer = intention.answer
+        kwargs = intention.kwargs
 
         vector = get_embedding_result(emb_model_id, question)
 
-        new_doc = {"doc": {"text": question, "metadata": {"answer": answer}, "vector_field":vector}}
+        new_doc = {"doc": {"text": question, "metadata": {"answer": answer, "kwargs": kwargs}, "vector_field":vector}}
 
         response = self.aos_client.update(index=index, id=intention_id, body=new_doc)
 

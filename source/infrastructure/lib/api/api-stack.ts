@@ -202,7 +202,7 @@ export class ApiConstruct extends Construct {
       },
     });
 
-    const methodOption_v1 = {
+    const methodOption = {
       authorizer: auth,
       apiKeyRequired: false,
       methodResponses: [
@@ -227,7 +227,7 @@ export class ApiConstruct extends Construct {
       ]
     };
 
-    const methodOption_llm = {
+    const methodOptionExternal = {
       authorizer: auth,
       // apiKeyRequired: true,
       methodResponses: [
@@ -257,7 +257,7 @@ export class ApiConstruct extends Construct {
     // apiResourceEmbedding.addMethod("{proxy+}", lambdaEmbeddingIntegration, methodOption);
     apiResourceEmbedding.addProxy({
       defaultIntegration: lambdaEmbeddingIntegration,
-      defaultMethodOptions: methodOption_v1,
+      defaultMethodOptions: methodOption,
     })
 
 
@@ -325,11 +325,11 @@ export class ApiConstruct extends Construct {
 
     // Define the API Gateway Method
     const apiResourceLLM = api.root.addResource("llm");
-    apiResourceLLM.addMethod("POST", lambdaExecutorIntegration, methodOption_llm);
+    apiResourceLLM.addMethod("POST", lambdaExecutorIntegration, methodOptionExternal);
 
     apiResourceLLM.addProxy({
       defaultIntegration: lambdaExecutorIntegration,
-      defaultMethodOptions: methodOption_llm
+      defaultMethodOptions: methodOptionExternal
     })
 
     const plan = api.addUsagePlan('ExternalUsagePlan', {
