@@ -228,7 +228,6 @@ export class ApiConstruct extends Construct {
     };
 
     const methodOptionExternal = {
-      authorizer: auth,
       // apiKeyRequired: true,
       methodResponses: [
         {
