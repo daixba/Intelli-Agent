@@ -90,7 +90,7 @@ class AOSUtil:
 
         vector = get_embedding_result(emb_model_id, question)
 
-        new_doc = {"doc": {"text": question, "metadata": {"answer": answer, "kwargs": kwargs}, "vector_field":vector}}
+        new_doc = {"doc": {"text": question, "metadata": {"answer": answer, "kwargs": kwargs}, "vector_field":vector[0]}}
 
         response = self.aos_client.update(index=index, id=intention_id, body=new_doc)
 
