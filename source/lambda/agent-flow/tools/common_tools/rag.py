@@ -1,14 +1,11 @@
 from common_logic.common_utils.lambda_invoke_utils import invoke_lambda
-from common_logic.common_utils.prompt_utils import get_prompt_templates_from_ddb
-from common_logic.common_utils.constant import (
-    LLMTaskType
-)
+from common_logic.common_utils.constant import LLMTaskType
 from common_logic.common_utils.lambda_invoke_utils import send_trace
 from utils.prompt_utils import get_system_prompt, PromptType
 
 
 def lambda_handler(event_body, context=None):
-    state = event_body['state']
+    state = event_body["state"]
     tool_name = event_body.get("tool_name", "")
 
     context_list = []
@@ -32,11 +29,11 @@ def lambda_handler(event_body, context=None):
             retrievers.append(retriever)
             break
 
-    query_key = "query"
+    query_key = "query_rewrite"
     retriever_params = {
-        "query": query_key,
+        "query": state[query_key],
         "type": "qd",
-        "retrievers": retrievers
+        "retrievers": retrievers,
     }
     # retriever_params = event_body['tool_init_kwargs']
     output: str = invoke_lambda(
@@ -53,9 +50,11 @@ def lambda_handler(event_body, context=None):
     # Remove duplicate figures
     unique_set = {tuple(d.items()) for d in figure_list}
     unique_figure_list = [dict(t) for t in unique_set]
-    state['extra_response']['figures'] = unique_figure_list
+    state["extra_response"]["figures"] = unique_figure_list
 
-    send_trace(f"\n\n**rag-contexts:** {context_list}", enable_trace=state["enable_trace"])
+    send_trace(
+        f"\n\n**rag-contexts:** {context_list}", enable_trace=state["enable_trace"]
+    )
 
     llm_config = state["chatbot_config"]["llm"]
     rag_event_body = {
